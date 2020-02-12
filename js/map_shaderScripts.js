@@ -84,12 +84,12 @@ function saveShot(){
 		curCtx.clearRect(0,0,curRotCanvas.width,curRotCanvas.height);
 		curCtx.save();
 		curCtx.translate(curRotCanvas.width*.5, curRotCanvas.height*.5);
-	if(flipHorizontal){
-		  curCtx.rotate(Math.PI*.5 * (flipHorizontal ? -1:1) ); // ##
+		if(flipHorizontal){
+			curCtx.rotate(Math.PI*.5 * (flipHorizontal ? -1:1) ); // ##
 		}else{
-		  curCtx.rotate(Math.PI*.5 * (flipHorizontal ? 1:-1) ); // ##
-}
-  curCtx.translate(-curRotCanvas.height*.5, -curRotCanvas.width*.5);
+			curCtx.rotate(Math.PI*.5 * (flipHorizontal ? 1:-1) ); // ##
+		}
+		curCtx.translate(-curRotCanvas.height*.5, -curRotCanvas.width*.5);
 		curCtx.drawImage(mapCanvas,0,0);
 		curCtx.restore();
 		cameraRender=curRotCanvas.toDataURL("image/png");

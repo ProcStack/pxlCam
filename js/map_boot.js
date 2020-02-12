@@ -17,7 +17,7 @@ function boot(){
 	document.addEventListener('touchend', function(e) {endTouch(e);}, false);
 	
 	window.addEventListener('deviceorientation', devicePoseData);
-	window.addEventListener('orientationchange', devicePoseChange);
+	//window.addEventListener('orientationchange', devicePoseChange);
 	
 	iconTray=document.getElementById('iconTray');
 	cameraLoading=document.getElementById('cameraLoadingBlock');
