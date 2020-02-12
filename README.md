@@ -1,5 +1,5 @@
 # pxlCam
-## Web Cam + ThreeJS Cam Filter App
+### Web Cam + ThreeJS Cam Filter App
 ### [pxlMancer.com/gl/pxlCam](https://www.pxlMancer.com/gl/pxlCam)
 ---
 
@@ -7,7 +7,7 @@ An experiment with ThreeJS to create a website for realtime gpu based filters.
 <br>Sampling cameras on device, allowing for adaptive camera resolutions, saving snapshots to disk, finding phone orientation, and muliple passes through ThreeJS's composer.
 
 ---
-### Functions of importance --
+#### Functions of importance --
 #### **js/map_deviceScripts.js** -
     checkMediaRes()
 Checks through the `camResCheckList` array of resolution widths to find the solid range of camera resolutions.
@@ -33,6 +33,6 @@ Convert color RGB to HSV/HSL and shift the values and convert back to RGB for di
 ---
 ### To-Do's
 My approach is to get the stuff working and isolate from there.
-That being said, I haven't found an easy to use and implement **Find all camera resolutions** webcam / WebRTC javascript system on the web.
+<br>That being said, I haven't found an easy to use and implement **Find all camera resolutions** webcam / WebRTC javascript system on the web.
 - Conver the mutli-resolution finder `checkMediaRes()` to an easy to use class.
  
