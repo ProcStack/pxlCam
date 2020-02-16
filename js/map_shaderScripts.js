@@ -42,22 +42,12 @@ function nextEffect(){
 	}
 	buildShaderPass(true);
 }
-function rotatePicture(){
-	rotatePictureMode=(rotatePictureMode+1)%2;//4;
-	filterShader.uniforms.uRotatePicture.value=rotatePictureMode;
-}
-function toggleScaling(){
-	compensateScale=!compensateScale;
-	//nextCamera();
-	filterShader.uniforms.uCompensateScale.value=compensateScale;
-}
 function findPictureAspect(save=false){
 	var aspectMult=[1,1];
 	if(!save){
-		let res=[sW,sH];//sW>sH?[sW,sH]:[sH,sW];
+		let res=[sW,sH];
 		let safe=[...camSafeRes[webcamActive]];
 		safe=mobile&&sH>sW?[safe[1],safe[0]]:safe;
-		//safe=safe[0]>safe[1]?safe:[safe[1],safe[0]];
 		let resAspect=[sW/sH, sH/sW];
 		let safeAspect=[safe[0]/safe[1], safe[1]/safe[0]];
 		
@@ -68,17 +58,23 @@ function findPictureAspect(save=false){
 	smartBlurShader.uniforms.uResAspectX.value=camPictureAspect[0];
 	smartBlurShader.uniforms.uResAspectY.value=camPictureAspect[1];
 }
+function takeShot(){
+	if(useFlash){
+		setDeviceFlash(true,true);
+	}else{
+		saveShot();
+	}
+}
 function saveShot(){
-	console.log(camSafeRes);
 	let r=camSafeRes[webcamActive];
 	r=mobile && sH>sW?[r[1],r[0]]:r;
 	var cameraRender;
-	setCanvasRes(r,true); // Renders the scene too	
+	setCanvasRes(r,true,true); // Renders the scene too	
 		
 	if(phonePoseActive && (Math.abs(phone_ypr[0])<.45 && sH>sW)){
 		var curRotCanvas=document.createElement("canvas");
-		curRotCanvas.height=camSafeRes[webcamActive][1];//mapCanvas.width;
-		curRotCanvas.width=camSafeRes[webcamActive][0];//mapCanvas.height;
+		curRotCanvas.height=camSafeRes[webcamActive][1];
+		curRotCanvas.width=camSafeRes[webcamActive][0];
 
 		var curCtx=curRotCanvas.getContext('2d');
 		curCtx.clearRect(0,0,curRotCanvas.width,curRotCanvas.height);
@@ -105,6 +101,8 @@ function saveShot(){
 	}
 	var cameraData=URL.createObjectURL(new Blob([arr]));
   
+	
+	if(verbose) verbConsole.innerHTML="Len "+(cameraRender*0.0009765625)+" | ";
 	var dt=new Date();
 	var timeSuffix="_"+(dt.getMonth()+1)+"-"+dt.getDate()+"-"+dt.getFullYear()+"_"+dt.getHours()+"-"+dt.getMinutes()+"-"+dt.getSeconds();
   
@@ -117,8 +115,9 @@ function saveShot(){
 	if(flipHorizontal){
 		filterShader.uniforms.uFlipHorizontal.value=true;
 	}
-	
 	setCanvasRes([sW,sH]); // Renders the scene too
+	
+	setDeviceFlash(false, false);
 }
 
 function filter_smartBlur(mult=1){
@@ -147,7 +146,6 @@ function filter_shiftEdgeThickness(force=false, mult=1){
 				"uResScaleY":{type:"f",value:1/sH},
 				"uResAspectX":{type:"f",value:camPictureAspect[0]},
 				"uResAspectY":{type:"f",value:camPictureAspect[1]},
-				"uRotatePicture":{type:"i",value:rotatePictureMode},
 				"uCompensateScale":{type:"b",value:compensateScale},
 				"uFlipHorizontal":{type:"b",value:flipHorizontal},
 				"uEdgeMode":{type:"i",value:effectMode},
@@ -174,7 +172,6 @@ function filter_shiftHueSaturation(force=false){
 				"uResScaleY":{type:"f",value:1/sH},
 				"uResAspectX":{type:"f",value:camPictureAspect[0]},
 				"uResAspectY":{type:"f",value:camPictureAspect[1]},
-				"uRotatePicture":{type:"i",value:rotatePictureMode},
 				"uCompensateScale":{type:"b",value:compensateScale},
 				"uFlipHorizontal":{type:"b",value:flipHorizontal},
 				"uFlattenScalar":{type:"f",value:hueSatch_flattenMultColor},
@@ -307,7 +304,6 @@ function webcamFragment_colorEdge(edgeReach){
 		uniform float		uResAspectY;
 		uniform float		uResScaleX;
 		uniform float		uResScaleY;
-		uniform int			uRotatePicture;
 		uniform bool		uCompensateScale;
 		uniform bool		uFlipHorizontal;
 		uniform float		uDarkenImage;
@@ -402,7 +398,6 @@ function webcamFragment_hueSatch(){
 		uniform float		uResAspectY;
 		uniform float		uResScaleX;
 		uniform float		uResScaleY;
-		uniform int			uRotatePicture;
 		uniform bool		uCompensateScale;
 		uniform bool		uFlipHorizontal;
 

@@ -1,5 +1,4 @@
 
-
 function stopStreams(stream){
 	if(stream){
 		stream.getVideoTracks()[0].stop();
@@ -13,7 +12,7 @@ function stopStreams(stream){
 function pausePlayback(){
 	mapPause=(mapPause+1)%2;
 	mapPause ? webcamVideo.pause() :  webcamVideo.play();
-	verbPaused.innerText=webcamVideo.paused?"PAUSED":"PLAYING";
+	if(verbose) verbPaused.innerText=webcamVideo.paused?"PAUSED":"PLAYING";
 	
 	let curMS=Date.now();
 	fpsGrabTime=curMS+1000;
@@ -41,10 +40,12 @@ function devicePoseData(e){
 		beta=Math.sin(beta*piMult); // Yaw
 		gamma=Math.sin(-gamma*piMult); // Pitch
 		alpha=Math.sin((alpha-180)*piMult); // Roll
-	
-		verbYaw.innerText=toHundreths(gamma);
-		verbPitch.innerText=toHundreths(beta);
-		verbRoll.innerText=toHundreths(alpha);
+		
+		if(verbose){
+			verbYaw.innerText=toHundreths(gamma);
+			verbPitch.innerText=toHundreths(beta);
+			verbRoll.innerText=toHundreths(alpha);
+		}
 		
 		if(!phonePoseActive) phone_yprInit=[beta,gamma,alpha];
 		phonePoseActive=true;
@@ -60,11 +61,13 @@ function devicePoseChange(e){
 }
 
 function nextCamera(){ // Delay boot, hoping this can prevent the delays in camera switches on mobile
-		verbPrevCamName.innerText=webcamNameList[webcamActive];
+		if(verbose) verbPrevCamName.innerText=webcamNameList[webcamActive];
 		
 		webcamActive=(webcamActive+1)%webcamList.length;
-		verbCurCam.innerText=webcamActive+1;
-		verbCurCamName.innerText=(webcamActive+1)+" - "+webcamNameList[webcamActive];
+		if(verbose){
+			verbCurCam.innerText=webcamActive+1;
+			verbCurCamName.innerText=(webcamActive+1)+" - "+webcamNameList[webcamActive];
+		}
 		stopStreams();
 		
 		if(camSafeRes[webcamActive]!=null){
@@ -79,13 +82,16 @@ function bootCamera(){
 			var cons;
 			var verb="";
 			var cons={ video:{"deviceId":webcamList[webcamActive], "width":{"exact":camSafeRes[webcamActive][0]}, "height":{"exact":camSafeRes[webcamActive][1]}}, audio:false};
+			//var cons={ video:{"deviceId":webcamList[webcamActive], "width":{"exact":1920}}, audio:false};
 				navigator.mediaDevices.getUserMedia(cons).then( function success(stream) {
 					webcamVideo.setAttribute("width",camSafeRes[webcamActive][0]);
 					webcamVideo.setAttribute("height",camSafeRes[webcamActive][1]);
 					window.stream=stream;
+					window.track=stream.getVideoTracks()[0];
 					webcamVideo.srcObject=stream;
 					webcamVideo.autofocus=true;
-					//webcamVideo.play();
+					//setCanvasRes( [stream.getVideoTracks()[0].getSettings().width,stream.getVideoTracks()[0].getSettings().height], false, false);
+					if(verbose) verbCamRes.innerHTML=stream.getVideoTracks()[0].getSettings().width+"x"+stream.getVideoTracks()[0].getSettings().height;
 					if(webcamNameList[webcamActive]==""){
 						webcamNameList=[];
 						navigator.mediaDevices.enumerateDevices().then( (mediaDevices) => {
@@ -97,11 +103,13 @@ function bootCamera(){
 							}
 							var nameSplit=webcamNameList[webcamActive].split(" ");
 							flipHorizontal=(nameSplit.indexOf("front")!=-1 || nameSplit.indexOf("front,")!=-1)?true:false;
+							useFrontFlash=webcamList.length==1?true:flipHorizontal;
 							filterShader.uniforms.uFlipHorizontal.value=flipHorizontal;
 						});
 					}else{
 						var nameSplit=webcamNameList[webcamActive].split(" ");
 						flipHorizontal=(nameSplit.indexOf("front")!=-1 || nameSplit.indexOf("front,")!=-1)?true:false;
+						useFrontFlash=webcamList.length==1?true:flipHorizontal;
 						filterShader.uniforms.uFlipHorizontal.value=flipHorizontal;
 					}
 					failedBootCount=0;
@@ -179,6 +187,7 @@ function findMediaDeviceData(mediaDevices){
 				webcamNameList.push(name);
 				camSafeRes.push(null);
 				camSafeResValid.push([]);
+				curResId.push(0);
 			}
 		}
 	});
@@ -192,6 +201,7 @@ function findMediaDeviceData(mediaDevices){
 	if(webcamNameList[webcamActive]==""){
 		var nameSplit=webcamNameList[webcamActive].split(" ");
 		flipHorizontal=(nameSplit.indexOf("front")!=-1 || nameSplit.indexOf("front,")!=-1)?true:false;
+		useFrontFlash=webcamList.length==1?true:flipHorizontal;
 		filterShader.uniforms.uFlipHorizontal.value=flipHorizontal;
 	}
 	
@@ -200,4 +210,43 @@ function findMediaDeviceData(mediaDevices){
 	}else{
 		document.getElementById("icon-nextCamera").style.visibility="visible";
 	} 	
+}
+
+//////////////////////////////////////
+
+function nextRes(){
+	curResId[webcamActive]=(curResId[webcamActive]+1)%camSafeResValid[webcamActive].length;
+	if(verbose){
+		verbConsole.innerHTML+="<br>Setting Res to - "+camSafeResValid[webcamActive][curResId[webcamActive]][0]+"x"+camSafeResValid[webcamActive][curResId[webcamActive]][1];
+	}
+	camSafeRes[webcamActive]=[...camSafeResValid[webcamActive][curResId[webcamActive]]];
+	findPictureAspect(false);
+	setCanvasRes([sW,sH], true, false);
+}
+
+//////////////////////////////////////
+
+function toggleFlash(dom){
+	useFlash=!useFlash;
+	nullToggle(dom);
+}
+
+function setDeviceFlash(active=false, savePhoto=false){
+	if(useFrontFlash){
+		frontFlash.style.visibility=active?"visible":"hidden";
+		flashActive=active;
+		delaySaveShot=savePhoto;
+		takeShotTime=Date.now()+flashWaitTime;
+	}else{
+		if(window.track){
+			let imageCapture=new ImageCapture(track);
+			let photoCapabilities=imageCapture.getPhotoCapabilities().then(()=>{
+				window.track.applyConstraints({ advanced:[{torch:active}] }).then(()=>{
+					flashActive=active;
+					delaySaveShot=savePhoto;
+					takeShotTime=Date.now()+flashWaitTime;
+				});
+			});
+		}
+	}
 }

@@ -21,8 +21,56 @@ function boot(){
 	
 	iconTray=document.getElementById('iconTray');
 	cameraLoading=document.getElementById('cameraLoadingBlock');
+	alignLines=document.getElementById('alignLines');
+	frontFlash=document.getElementById('frontFlash');
 	
+	buildIcons();
+	setAlignLines();
+	if(verbose) prepVerbose();
+	
+	mapCanvas=document.getElementById(pxlCamCore);
+	mapW=window.innerWidth*mapResPerc;
+	mapCanvas.width=window.innerWidth;
+	mapH=window.innerHeight*mapResPerc;
+	mapCanvas.height=window.innerHeight;
+	mapBootEngine();
+	mapRender(runner);
+	//mapPrepGUI();
+	//launchFullscreen(mapCanvas);
+}
+
+function prepVerbose(){
 	verbBlock=document.getElementById('verbose');
+	let innerVerbose=`
+		<div id="verbose_fps"></div>
+		<div id="verbose_deviceResData">
+			Device Res : <span id="verbose_deviceRes">--</span>
+		</div>
+		<div id="verbose_camData">
+			Current Camera : <span id="verbose_curCamName"></span> - <span id="verbose_curCamNumber"></span> of <span id="verbose_maxCamNumber"> - <span id="verbose_paused">PAUSED</span>
+		</div>
+		<div id="verbose_camRes">
+			Current Camera Res : <span id="verbose_curCamRes">--</span>
+		</div>
+		<div id="verbose_camPausedState">
+			Orientation : Yaw - <span id="verbose_yaw">-</span> ; Pitch - <span id="verbose_pitch">-</span> ; Roll - <span id="verbose_roll">-</span> ;
+		</div>
+		<!-- <div id="verbose_camOrientationAngle">
+			Device Angle : <span id="verbose_curAngle">--</span>
+		</div> -->
+		<div id="verbose_prevCamData">
+			Previous Camera :</span> <span id="verbose_prevCam"></span>
+		</div>
+		<br>
+		<div id="verbose_spacer"> --- --- Console --- ---</div>
+		<div id="verbose_console"></div>
+	`;
+	let alDom=document.getElementById("icon-alignLines");
+	let topOff=alDom.offsetTop*2+parseFloat(alDom.style.height);
+	verbBlock.style.top=topOff;
+	verbBlock.style.left=3;
+	verbBlock.innerHTML=innerVerbose;
+	
 	verbFPS=document.getElementById('verbose_fps');
 	verbDeviceRes=document.getElementById('verbose_deviceRes');
 	verbCurCam=document.getElementById('verbose_curCamNumber');
@@ -37,20 +85,17 @@ function boot(){
 	verbPitch=document.getElementById('verbose_pitch');
 	verbRoll=document.getElementById('verbose_roll');
 	verbCurAngle=document.getElementById('verbose_curAngle');
+	
+	verbBlock.style.display='inline';
 
-	if(verbose){
-		verbBlock.style.display='inline';
-		verbDeviceRes.innerHTML=sW+"x"+sH;
-	}
-	mapCanvas=document.getElementById(pxlCamCore);
-	mapW=window.innerWidth*mapResPerc;
-	mapCanvas.width=window.innerWidth;
-	mapH=window.innerHeight*mapResPerc;
-	mapCanvas.height=window.innerHeight;
-	mapBootEngine();
-	mapRender(runner);
-	//mapPrepGUI();
-	//launchFullscreen(mapCanvas);
+	verbDeviceRes.innerHTML=sW+"x"+sH;
+	
+	window.onerror=(msg,source,line,col,err)=>{
+		verbConsole.innerHTML=msg;
+		verbConsole.innerHTML+="<br>"+source;
+		verbConsole.innerHTML+="<br>Line - "+line+" | Col - "+col;
+		verbConsole.innerHTML+="<br>"+err;
+	};
 }
 
 function getMouseXY(e){
@@ -101,6 +146,7 @@ function mapOnUp(e){
 	xyDeltaData.active=0;
 	xyDeltaData.latched=0;
 	xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
+	setCursor("default");
 }
 function mapOnExitMode(){
 	xyDeltaData.startPos=new THREE.Vector2(0,0);
@@ -113,7 +159,6 @@ function mapOnExitMode(){
 	xyDeltaData.latchMatrix=null;
 	mouseWheelDelta=0;
 	pxlCamCameraObjLatchOffset=[0,0];
-	setCursor("default");
 	pxlCamCameraObjLatchPrev=null;
 }
 function mouseWheel(e){ // Scroll wheel
@@ -148,18 +193,21 @@ function mouseWheel(e){ // Scroll wheel
 function resizeRenderResolution(){
 	mapW=(sW=window.innerWidth)*mapResPerc;
 	mapH=(sH=window.innerHeight)*mapResPerc;
-	verbDeviceRes.innerHTML=sW+"x"+sH;
+	if(verbose) verbDeviceRes.innerHTML=sW+"x"+sH;
 	setCanvasRes([sW,sH]);
+	buildIcons();
 }
-function setCanvasRes(res,save=false){
+function setCanvasRes(res,setCanvas=true,save=false){
 	mapW=res[0];
 	mapH=res[1];
 	
 	findPictureAspect(save);
 	bootCamera();
 	
-	mapCanvas.width=mapW;
-	mapCanvas.height=mapH;
+	if(setCanvas){
+		mapCanvas.width=mapW;
+		mapCanvas.height=mapH;
+	}
 	pxlCamEngine.setPixelRatio(1);//window.devicePixelRatio*mapResPerc);
 	pxlCamEngine.setSize(mapW/mapResPerc, mapH/mapResPerc);
 	pxlCamCamera.aspect=mapW/mapH;
@@ -247,6 +295,7 @@ function endTouch(e) {
 	xyDeltaData.active=0;
 	xyDeltaData.latched=0;
 	xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
+	setCursor("default");
 }
 
 function setCursor(cursorType){
@@ -355,11 +404,6 @@ function mapBootEngine(){
 	webcamVideo.setAttribute("autoplay", "");
 	webcamVideo.setAttribute("muted", "");
 	webcamVideo.setAttribute("playsinline", "");
-	
-	webcamResChecker=document.getElementById("webcamResChecker");
-	webcamResChecker.setAttribute("autoplay", "");
-	webcamResChecker.setAttribute("muted", "");
-	webcamResChecker.setAttribute("playsinline", "");
 	
 	if(verbose){
 		webcamVideo.onloadedmetadata=()=>{

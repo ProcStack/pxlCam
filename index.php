@@ -31,6 +31,7 @@ Created by Kevin Edzenga; September 2019 --
 If you are digging around in the source, I'm glad others out there do that!
 -->
 <meta name="viewport" content="width=device-width, initial-scale=.85, user-scalable=no"></meta>
+<link rel="stylesheet" href="pxlCamStyle.css">
 <script src="js/map_three.min.js"></script>
 <script src="js/EffectComposer.js"></script>
 <script src="js/CopyShader.js"></script>
@@ -52,130 +53,24 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 <script src="js/map_deviceScripts.js?q=<?php echo $t; ?>"></script>
 <script src="js/map_shaderScripts.js?q=<?php echo $t; ?>"></script>
 
-<style>
-BODY{
-	margin:0px;
-	padding:0px;
-	background-color:#000000;
-	user-select:none;
-	touch-action:none;
-	font-family:Tahoma;
-}
-.iconTray{
-	width:100%;
-	position:fixed;
-	bottom:0%;
-	left:0px;
-	z-index:50;
-}
-.iconParent{
-	margin:auto;
-	text-align:center;
-	font-size:350%;
-	color:#fff;
-	filter: drop-shadow(0px 0px 4px #000);
-}
-.icon{
-	margin:10px;
-	display:inline;
-	visibility:visible;
-}
-.larger{
-	font-size:1300%;
-}
-.verboseBlock{
-	position:absolute;
-	top:0px;
-	left:0px;
-	z-index:15;
-	color:#ffffff;
-	display:none;
-	width:100%;
-	filter: drop-shadow(0px 0px 4px #000);
-}
-
-.cameraLoadingBlock{
-	//background-color:#000;
-	position:fixed;
-	top:0px;
-	left:0px;
-	width:100%;
-	height:100%;
-	overflow:hidden;
-	z-index:10;
-}
-.cameraLoadingText{
-	width:100%;
-	filter: drop-shadow(0px 0px 4px #000);
-	font-size:220%;
-	font-family:Tahoma;
-	color:#ffffff;
-	text-align:center;
-	position:fixed;
-	top:35%;
-	left:50%;
-	transform:translate(-50%,-50%);
-}
-.header{
-	margin-bottom:10px;
-}
-.detect{
-	font-size:70%;
-}
-.sub{
-	font-size:55%;
-	font-style:italic;
-}
-
-.fader{
-	transition: opacity 1s, filter 1s;
-}
-.visOn{
-	filter:alpha(opacity=100);
-	opacity:1.0;
-}
-.visOff{
-	filter:alpha(opacity=0);
-	opacity:0.0;
-}
-</style>
-
 <body onLoad="boot();">
-<div id="verbose" class="verboseBlock">
-	<div id="verbose_fps"></div>
-	<div id="verbose_deviceResData">
-		Device Res : <span id="verbose_deviceRes">--</span>
-	</div>
-	<div id="verbose_camData">
-		Current Camera : <span id="verbose_curCamName"></span> - <span id="verbose_curCamNumber"></span> of <span id="verbose_maxCamNumber"> - <span id="verbose_paused">PAUSED</span>
-	</div>
-	<div id="verbose_camRes">
-		Current Camera Res : <span id="verbose_curCamRes">--</span>
-	</div>
-	<div id="verbose_camPausedState">
-		Orientation : Yaw - <span id="verbose_yaw">-</span> ; Pitch - <span id="verbose_pitch">-</span> ; Roll - <span id="verbose_roll">-</span> ;
-	</div>
-	<!-- <div id="verbose_camOrientationAngle">
-		Device Angle : <span id="verbose_curAngle">--</span>
-	</div> -->
-	<div id="verbose_prevCamData">
-		Previous Camera :</span> <span id="verbose_prevCam"></span>
-	</div>
-	<br>
-	<div id="verbose_spacer"> --- --- Console --- ---</div>
-	<div id="verbose_console"></div>
-</div>
+<div id="verbose" class="verboseBlock"></div>
+
 <video id="webcamVideo" style="position:absolute; top:0px;left:0px;z-index:10;display:none;"></video>
-<video id="webcamResChecker" style="position:absolute; top:0px;left:0px;z-index:9;display:none;"></video>
 <canvas id="pxlCam-core" style="touch-action:none;"></canvas>
 
-<table id="iconTray" cellpadding=0 cellscaping=0 border=0 width="100%" class="iconTray"><tr>
-	<td class="iconParent"><div id="icon-nextEffect" class="icon" onClick="nextEffect();">…</div>
-		<!-- <br><br><div id="icon-toggleScaling" class="icon" onClick="toggleScaling();">‡</div></td> -->
-	<td class="iconParent larger"><div id="icon-saveShot" class="icon" onClick="saveShot();">o</div></td>
-	<!-- <td class="icon"><div id="icon-rotatePicture" class="icon" onClick="rotatePicture();">↻</div></td> -->
-	<td class="iconParent"><div id="icon-nextCamera" class="icon" style="visibility:hidden;" onClick="nextCamera();">»</div></td>
-</tr></table>
+<div id="iconTray" class="iconTray">
+	<div id="icon-nextEffect" class="iconParent iconMode drop" onClick="nextEffect();" draw="mode" scale="1"></div>
+	<div id="icon-alignLines" class="iconParent iconAlignLines drop" onClick="setAlignLines();" draw="alignLines" scale=".65"></div>
+	<div id="icon-flash" class="iconParent iconFlash drop" onClick="toggleFlash(this);" draw="flash" scale=".65"></div>
+	<div id="icon-saveShot" class="iconParent iconTakePhoto drop large" onClick="takeShot();" scale="1">
+		<div id="icon-saveShotInnerBorder" class="iconTakePhotoInnerBorder"></div>
+		<div id="icon-saveShotInner" class="iconTakePhotoInner"></div>
+		<div id="icon-saveShotInnerDot" class="iconTakePhotoInnerDot"></div>
+	</div>
+	<div id="icon-nextCamera" class="iconParent iconNextCamera drop" onClick="nextCamera();" draw="nextCam" scale="1"></div>
+	<?php if($verbose==1){ ?><div id="icon-nextRes" class="iconParent iconNextRes drop" onClick="nextRes();" draw="nextRes" scale="1"></div><?php } ?>
+</div>
 
 <div id="cameraLoadingBlock" class="cameraLoadingBlock visOff">
 	<div id="cameraLoadingText" class="cameraLoadingText">
@@ -184,6 +79,11 @@ BODY{
 		<br><span class="sub">( Occurs once per camera )</span>
 	</div>
 </div>
+
+<div id="alignLines" class="alignLines" displayMode=0></div>
+
+<div id="frontFlash" class="frontFlash"></div>
+
 
 </body>
 </html>

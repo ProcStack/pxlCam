@@ -8,6 +8,14 @@ var mapAutoQuality=1;
 //var loadFullTome=mobile?0:1;
 var loadFullTome=0;
 var cameraLoading,iconTray;
+var alignLines;
+var frontFlash;
+var takeShotTime=0;
+var flashWaitTime=1000;
+var useFlash=false;
+var useFrontFlash=false;
+var flashActive=false;
+var delaySaveShot=false;
 var verbBlock,verbFPS,verbDeviceRes,verbCurCam,verbCurCamName,verbPrevCamName,verbMaxCam,verbPaused,verbConsole,verbYaw,verbPitch,verbRoll,verbCamRes,verbCurAngle;
 
 var mapProcessScene=null; // mapProcessScene.add(processorObj[0]);
@@ -83,6 +91,7 @@ const attrObserver=new MutationObserver(attrMutationCallback);
 // Store and run from the higher value
 var camSafeRes=[]; // Keep the safe, dispose of the rest!
 var camSafeResValid=[];
+var curResId=[];
 var camOddResList=[
 	480,
 	640,
@@ -151,7 +160,6 @@ var texLoader;
 var textLoaderArray=[];
 var effectMode=0;
 var webcamVideo;
-var webcamResChecker;
 var webcamActive=0;
 var webcamList=[];
 var webcamNameList=[];
@@ -163,7 +171,6 @@ var vidGeo;
 var vidMat;
 var vidMesh;
 var compensateScale=mobile==1?true:false;
-var rotatePictureMode=0;
 var runSmartBlur=true;
 var runDarkenImage=true;
 var darkenImageDist=1;
