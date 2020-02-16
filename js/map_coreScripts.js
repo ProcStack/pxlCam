@@ -1,7 +1,6 @@
 function buildIcons(){
-	let smallIcons=["icon-nextEffect","icon-alignLines","icon-nextCamera","icon-flash"];
-	let largeIcons=["icon-saveShot"];
-	let iconList=[...document.getElementById("iconTray").children];
+	let iconAdds=["thumbnailImage"];
+	let iconList=[...document.getElementById("iconTray").children, ...iconAdds.map((i)=>document.getElementById(i))];
 	iconList.map(d=>{
 		let scalar=d.hasAttribute("scale")?parseFloat(d.getAttribute("scale")):1;
 		let size=Math.min(sW,sH)*((d.classList.contains('large')?.12:.07)*(mobile?2.5:1)*scalar);
@@ -26,6 +25,14 @@ function buildIcons(){
 			}
 		}
 	});
+	
+	thumbnailCanvas=thumbnailImage.children[0];
+}
+function setThumbnailPosition(){
+	let nCam=document.getElementById('icon-nextCamera');
+	let nBottom=nCam.style.bottom+nCam.offsetHeight;
+	let tBlock=document.getElementById('thumbnailBlock');
+	tBlock.style.bottom=nBottom;
 }
 function nullToggle(obj){
 	let canvas=obj.getElementsByTagName('canvas');
@@ -40,7 +47,9 @@ function drawIcon(can, draw, size){
 	let curLine=[];
 	let fill=false;
 	let runNull=false
-	if(draw=="mode"){
+	if(draw=="blank"){
+		return;
+	}else if(draw=="mode"){
 		curLine=[.42,.27, .5,.42, .58,.27];
 		points.push(curLine);
 		curLine=[.42,.27, .5,.38, .58,.27];
@@ -181,10 +190,10 @@ function degToRad(deg){
 	return deg*(Math.PI/180);
 }
 
-function mapRender(){
+function pxlRender(){
 	runner++;
-	var curMS=Date.now();
-	let delta=(curMS-startTime);
+	var curTime=Date.now();
+	let delta=(curTime-clockTime);
 	if(runSmartBlur){
 		if(delta/30<.7){
 			runSmartBlur=false;
@@ -194,16 +203,16 @@ function mapRender(){
 	if(verbose){
 		verbPaused.innerText=webcamVideo.paused?"PAUSED":"PLAYING";
 		fpsCount++;
-		verbFPS.innerText=delta+" ms - "+fpsAvg+" fps average" ;
-		if(curMS>fpsGrabTime){
-			fpsGrabTime=curMS+1000;
+		if(curTime>fpsGrabTime){
+			verbFPS.innerText=delta+" ms - "+fpsAvg+" fps average" ;
 			
+			fpsGrabTime=curTime+1000;
 			fpsAvg=fpsAvg==0?fpsCount: (fpsAvg*2+fpsCount)*.33333333333333;
 			fpsAvg=(fpsAvg+"").substr(0,5);
 			fpsCount=0;
 		}
 	}
-	startTime=curMS;
+	clockTime=curTime;
 	
 	if(camSafeRes[webcamActive]==null){
 		camResCheckList=[...camResOrigCheckList];
@@ -235,17 +244,23 @@ function mapRender(){
 		}
 	}
 	
-	if(delaySaveShot && useFlash && curMS>takeShotTime){
+	checkFadeOutList();
+	
+	if(delaySaveShot && useFlash && curTime>takeShotTime){
 		delaySaveShot=false;
 		saveShot();
 	}else{
 		if(camSafeResFound){
-			pxlCamComposer.render();
-			pxlCamShaderComposer.render();
+			pxlRenderStack();
 		}
 	}
 	
-	if(mapPause == 0){
-		requestAnimationFrame(mapRender);
+	if(!pxlPause){
+		requestAnimationFrame(pxlRender);
 	}
+}
+
+function pxlRenderStack(){
+	pxlCamComposer.render();
+	pxlCamShaderComposer.render();
 }

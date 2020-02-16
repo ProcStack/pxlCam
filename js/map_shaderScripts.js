@@ -68,7 +68,7 @@ function takeShot(){
 function saveShot(){
 	let r=camSafeRes[webcamActive];
 	r=mobile && sH>sW?[r[1],r[0]]:r;
-	var cameraRender;
+	var cameraRender,cameraCanvas;
 	setCanvasRes(r,true,true); // Renders the scene too	
 		
 	if(phonePoseActive && (Math.abs(phone_ypr[0])<.45 && sH>sW)){
@@ -86,13 +86,16 @@ function saveShot(){
 			curCtx.rotate(Math.PI*.5 * (flipHorizontal ? 1:-1) ); // ##
 		}
 		curCtx.translate(-curRotCanvas.height*.5, -curRotCanvas.width*.5);
-		curCtx.drawImage(mapCanvas,0,0);
+		curCtx.drawImage(pxlCanvas,0,0);
 		curCtx.restore();
-		cameraRender=curRotCanvas.toDataURL("image/png");
+		cameraCanvas=curRotCanvas;
 	}else{
-		cameraRender=mapCanvas.toDataURL("image/png");
+		cameraCanvas=pxlCanvas;
 	}
-	
+	cameraRender=pxlCanvas.toDataURL("image/png");
+		
+	////////////////////////////////////////////////////
+	// Convert png data to blob for direct download
 	var blob=atob(cameraRender.split(',')[1]);
 	var len=blob.length;
 	var arr=new Uint8Array(len);
@@ -101,13 +104,46 @@ function saveShot(){
 	}
 	var cameraData=URL.createObjectURL(new Blob([arr]));
   
-	
-	if(verbose) verbConsole.innerHTML="Len "+(cameraRender*0.0009765625)+" | ";
+	////////////////////////////////////////////////////
+	// File listing info
 	var dt=new Date();
 	var timeSuffix="_"+(dt.getMonth()+1)+"-"+dt.getDate()+"-"+dt.getFullYear()+"_"+dt.getHours()+"-"+dt.getMinutes()+"-"+dt.getSeconds();
-  
+	let fileName="pxlCam"+timeSuffix+".png";
+	//let fileSizeKB=len*0.0009765625;
+	//let fileSizeMB=fileSizeKB*0.0009765625;
+	let fileSizeKB=toHundreths(len*0.001);
+	let fileSizeMB=toHundreths(fileSizeKB*0.001);
+	let thumbnailPrompt=fileSizeMB>1?fileSizeMB+" MB":fileSizeKB+" KB";
+	thumbnailPrompt+="<br>Edit Below";
+	if(verbose) verbConsole.innerHTML="KB - "+fileSizeKB+" | MB - "+fileSizeMB;
+	
+	let ratio;
+	let scalar=[0,0,cameraCanvas.width, cameraCanvas.height];
+	if(scalar[3]<scalar[2]){
+		ratio=thumbnailCanvas.height/scalar[3];
+	}else{
+		ratio=thumbnailCanvas.width/scalar[2];
+	}
+	scalar=[
+		(scalar[0]-scalar[2]*.5)*ratio+scalar[2]*.5,
+		(scalar[1]-scalar[3]*.5)*ratio+scalar[3]*.5,
+		(scalar[2]*.5)*ratio+scalar[2]*.5,
+		(scalar[3]*.5)*ratio+scalar[3]*.5
+	];
+	let tCtx=thumbnailCanvas.getContext("2d");
+	tCtx.drawImage(cameraCanvas, ...scalar, 0,0,thumbnailCanvas.width,thumbnailCanvas.height);
+	thumbnailCanvas.src=cameraRender;
+	
+	if(verbose){
+		thumbnailText.innerHTML=thumbnailPrompt;
+		promptScreen(thumbnailText,true,3);
+		promptScreen(thumbnailImage,true);
+	}
+	
+	////////////////////////////////////////////////////
+	// Auto download image
 	var tempLink=document.createElement("a");
-	tempLink.download="pxlCam"+timeSuffix+".png";
+	tempLink.download=fileName;
 	tempLink.href=cameraData;
 	document.body.appendChild(tempLink);
 	tempLink.click();
@@ -118,6 +154,7 @@ function saveShot(){
 	setCanvasRes([sW,sH]); // Renders the scene too
 	
 	setDeviceFlash(false, false);
+	
 }
 
 function filter_smartBlur(mult=1){

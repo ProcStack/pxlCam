@@ -84,6 +84,12 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 
 <div id="frontFlash" class="frontFlash"></div>
 
+<div id="thumbnailBlock" class="thumbnailBlock">
+	<div id="thumbnailText" class="thumbnailText visOff">
+	</div>
+	<div id="thumbnailImage" class="thumbnailImage visOff" draw="blank" scale="1">
+	</div>
+</div>
 
 </body>
 </html>

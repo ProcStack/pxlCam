@@ -18,11 +18,11 @@ var flashActive=false;
 var delaySaveShot=false;
 var verbBlock,verbFPS,verbDeviceRes,verbCurCam,verbCurCamName,verbPrevCamName,verbMaxCam,verbPaused,verbConsole,verbYaw,verbPitch,verbRoll,verbCamRes,verbCurAngle;
 
-var mapProcessScene=null; // mapProcessScene.add(processorObj[0]);
-var mapCanvas,mapW,mapH;
+var pxlProcessScene=null; // pxlProcessScene.add(processorObj[0]);
+var pxlCanvas,pxlW,pxlH;
 var sW=window.innerWidth;
 var sH=window.innerHeight;
-var mapMouse=new THREE.Vector2();
+var pxlMouse=new THREE.Vector2();
 
 // ========================================
 var mouseX=sW/2;
@@ -42,15 +42,15 @@ var xyDeltaData={
 	'netDistance':[0,0,0], //vec2
 	'curDistance':[0,0,0], //vec2
 };
-var firefox=/Firefox/i.test(navigator.userAgent);
-var mouseWheelEvt=(firefox)? "DOMMouseScroll" : "mousewheel" ;
+const firefox=/Firefox/i.test(navigator.userAgent);
+const mouseWheelEvt=(firefox)? "DOMMouseScroll" : "mousewheel" ;
 var mouseWheelDelta=0;
 var mouseButton=0;
 var prevCursor=null;
-var IE = document.all?true:false;
+const IE = document.all?true:false;
 var touch =0;
 var touchScreen=0;
-var startTime=Date.now();
+var clockTime=Date.now();
 var fpsGrabTime=Date.now()+1000;
 var fpsAvg=0;
 var fpsCount=0;
@@ -61,9 +61,10 @@ var geoLoadListComplete=0;
 var geoFunctionList=[];
 var lightList=[];
 var lightMapList=[];
-var mapPause=0;
+var pxlPause=false;
+var renderPause=false;
 var runner=-1;
-var pi=3.14159265358979;
+const pi=3.14159265358979;
 
 // ========================================
 
@@ -141,9 +142,6 @@ var camSafeResList=[
 	3840
 ];
 var camResOrigCheckList=[...camOddResList];
-//for(var x=0; x<camOddResList.length;++x){
-//	camResOrigCheckList.push([camOddResList[x][1],camOddResList[x][0]]);
-//}
 var camResCheckList=[...camResOrigCheckList];
 var camResRunLength=camResOrigCheckList.length;
 var camResIttr=0;
@@ -156,6 +154,11 @@ var camPictureAspect=[1,1];
 
 // ========================================
 
+var fadeOutList=[];
+var thumbnailText,thumbnailImage,thumbnailCanvas;
+
+// ========================================
+
 var texLoader;
 var textLoaderArray=[];
 var effectMode=0;
@@ -163,6 +166,7 @@ var webcamVideo;
 var webcamActive=0;
 var webcamList=[];
 var webcamNameList=[];
+
 var delayLoadCam=false; // Keep false; ticks on once camera boots initially camera on boot
 var failedBootCount=0;
 var flipHorizontal=false;
@@ -170,6 +174,7 @@ var vidTexture;
 var vidGeo;
 var vidMat;
 var vidMesh;
+
 var compensateScale=mobile==1?true:false;
 var runSmartBlur=true;
 var runDarkenImage=true;

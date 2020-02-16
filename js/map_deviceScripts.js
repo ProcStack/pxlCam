@@ -10,17 +10,9 @@ function stopStreams(stream){
 }
 
 function pausePlayback(){
-	mapPause=(mapPause+1)%2;
-	mapPause ? webcamVideo.pause() :  webcamVideo.play();
+	pxlPause=!pxlPause;
+	pxlPause ? window.stream.getVideoTracks()[0].stop() : (renderPause=true,bootCamera());
 	if(verbose) verbPaused.innerText=webcamVideo.paused?"PAUSED":"PLAYING";
-	
-	let curMS=Date.now();
-	fpsGrabTime=curMS+1000;
-	fpsCount=0;
-	
-	if(mapPause==0){
-		mapRender(runner);
-	}
 }
 
 // I'm using the phone's face as the top, so -- 
@@ -113,6 +105,15 @@ function bootCamera(){
 						filterShader.uniforms.uFlipHorizontal.value=flipHorizontal;
 					}
 					failedBootCount=0;
+				}).then(()=>{
+					if(renderPause==true){
+						renderPause=false;
+						let curTime=Date.now();
+						fpsGrabTime=curTime+1000;
+						fpsCount=0;
+						pxlRenderStack();
+						pxlRender(runner);
+					}
 				}).catch( function (err){
 					delayLoadCam=true;
 					failedBootCount+=1;
@@ -208,6 +209,7 @@ function findMediaDeviceData(mediaDevices){
 	if(webcamList.length == 1 ){
 		document.getElementById("icon-nextCamera").style.visibility="hidden";
 	}else{
+		setThumbnailPosition();
 		document.getElementById("icon-nextCamera").style.visibility="visible";
 	} 	
 }

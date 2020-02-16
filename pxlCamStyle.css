@@ -7,6 +7,8 @@ BODY{
 	font-family:Tahoma;
 }
 
+/*-------------------------------------------*/
+
 .drop{
 	filter: drop-shadow(0px 0px 4px #000);
 }
@@ -23,6 +25,8 @@ BODY{
 	z-index:8;
 	visibility:hidden;
 }
+
+/*-------------------------------------------*/
 
 .iconTray{
 	width:100%;
@@ -130,6 +134,41 @@ BODY{
 	left:6%;
 }
 
+/*-------------------------------------------*/
+
+.thumbnailBlock{
+	position:fixed;
+	transform:translateX(-50%);
+	bottom:1%;
+	right:12%;
+	margin:10px;
+	text-align:center;
+	color:#fff;
+	filter: drop-shadow(0px 0px 3px #000);
+	display:inline;
+	visibility:visible;
+	z-index:51;
+}
+.thumbnailText{
+	background-color:rgba(170,170,170,.3);
+	border-style:solid;
+	border-width:2px;
+	border-color:#aaa;
+	border-radius:10px;
+	margin:5px;
+}
+.thumbnailImage{
+	overflow:hidden;
+	width:100px;
+	height:100px;
+	border-style:solid;
+	border-width:3px;
+	border-color:#ccc;
+	border-radius:50%;
+}
+
+/*-------------------------------------------*/
+
 .verboseBlock{
 	position:fixed;
 	top:0px;
@@ -139,6 +178,8 @@ BODY{
 	display:none;
 	width:100%;
 }
+
+/*-------------------------------------------*/
 
 .cameraLoadingBlock{
 	position:fixed;
@@ -170,6 +211,8 @@ BODY{
 	font-size:55%;
 	font-style:italic;
 }
+
+/*-------------------------------------------*/
 
 .alignLines{
 	position:fixed;
@@ -231,6 +274,7 @@ BODY{
 	border-radius:0%;
 }
 
+/*-------------------------------------------*/
 
 .fader{
 	transition: opacity 1s, filter 1s;
