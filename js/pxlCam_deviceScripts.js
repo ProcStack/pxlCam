@@ -106,6 +106,7 @@ function bootCamera(){
 					}
 					failedBootCount=0;
 				}).then(()=>{
+					findPictureAspect();
 					if(renderPause==true){
 						renderPause=false;
 						let curTime=Date.now();
@@ -147,7 +148,7 @@ function checkMediaRes(){
 				stopStreams(stream);
 				camSafeResFound=true;
 				delayLoadCam=true;
-				promptScreen(cameraLoading, false);
+				promptFader(cameraLoading, false);
 				if(verbose){
 					let verb='Found Resolutions - '
 					for(var x=0; x<camSafeResValid[webcamActive].length;++x){

@@ -97,21 +97,25 @@ function saveShot(){
 	////////////////////////////////////////////////////
 	// Convert png data to blob for direct download
 	var blob=atob(cameraRender.split(',')[1]);
-	var len=blob.length;
-	var arr=new Uint8Array(len);
-	for(var x=0; x<len; ++x){
+	var fileSize=blob.length;
+	var arr=new Uint8Array(fileSize);
+	for(var x=0; x<fileSize; ++x){
 		arr[x]=blob.charCodeAt(x);
 	}
 	var cameraData=URL.createObjectURL(new Blob([arr]));
+	
   
 	////////////////////////////////////////////////////
 	// File listing info
 	var dt=new Date();
 	var timeSuffix="_"+(dt.getMonth()+1)+"-"+dt.getDate()+"-"+dt.getFullYear()+"_"+dt.getHours()+"-"+dt.getMinutes()+"-"+dt.getSeconds();
 	let fileName="pxlCam"+timeSuffix+".png";
-	//let fileSizeKB=len*0.0009765625;
+	
+	addPhotoBinEntry("photoBinScroller", r, cameraRender, cameraData, fileName, fileSize);
+	
+	//let fileSizeKB=fileSize*0.0009765625;
 	//let fileSizeMB=fileSizeKB*0.0009765625;
-	let fileSizeKB=toHundreths(len*0.001);
+	let fileSizeKB=toHundreths(fileSize*0.001);
 	let fileSizeMB=toHundreths(fileSizeKB*0.001);
 	let thumbnailPrompt=fileSizeMB>1?fileSizeMB+" MB":fileSizeKB+" KB";
 	thumbnailPrompt+="<br>Edit Below";
@@ -119,26 +123,27 @@ function saveShot(){
 	
 	let ratio;
 	let scalar=[0,0,cameraCanvas.width, cameraCanvas.height];
+	let tmp=[...scalar];
+	let pushIn=.75;
 	if(scalar[3]<scalar[2]){
-		ratio=thumbnailCanvas.height/scalar[3];
+		scalar[0]=tmp[2]*.5-(tmp[3]*pushIn*camPictureAspect[0])*.5;
+		scalar[1]=tmp[3]*camPictureAspect[1]*(1-pushIn);
+		scalar[2]=tmp[3]*pushIn*camPictureAspect[1];
+		scalar[3]=tmp[3]*camPictureAspect[1]*(pushIn);
 	}else{
-		ratio=thumbnailCanvas.width/scalar[2];
+		scalar[0]=tmp[2]*camPictureAspect[0]*(1-pushIn);
+		scalar[1]=tmp[3]*.5-(tmp[2]*pushIn*camPictureAspect[0])*.5;
+		scalar[2]=tmp[2]*camPictureAspect[0]*(pushIn);
+		scalar[3]=tmp[2]*pushIn*camPictureAspect[1];
 	}
-	scalar=[
-		(scalar[0]-scalar[2]*.5)*ratio+scalar[2]*.5,
-		(scalar[1]-scalar[3]*.5)*ratio+scalar[3]*.5,
-		(scalar[2]*.5)*ratio+scalar[2]*.5,
-		(scalar[3]*.5)*ratio+scalar[3]*.5
-	];
+	
 	let tCtx=thumbnailCanvas.getContext("2d");
 	tCtx.drawImage(cameraCanvas, ...scalar, 0,0,thumbnailCanvas.width,thumbnailCanvas.height);
-	thumbnailCanvas.src=cameraRender;
+	//thumbnailCanvas.src=cameraRender;
 	
-	if(verbose){
-		thumbnailText.innerHTML=thumbnailPrompt;
-		promptScreen(thumbnailText,true,3);
-		promptScreen(thumbnailImage,true);
-	}
+	thumbnailText.innerHTML=thumbnailPrompt;
+	promptFader(thumbnailText,true,3);
+	promptFader(thumbnailImage,true);
 	
 	////////////////////////////////////////////////////
 	// Auto download image

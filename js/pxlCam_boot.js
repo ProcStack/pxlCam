@@ -17,7 +17,11 @@ function boot(){
 	document.addEventListener('touchend', function(e) {endTouch(e);}, false);
 	
 	window.addEventListener('deviceorientation', devicePoseData);
-	//window.addEventListener('orientationchange', devicePoseChange);
+	//window.addEventListener('orientationchange', devicePoseChange); // Don't know when this ever fires, docs seem like it should run tho
+	
+	menuBlock=document.getElementById('menuBlock');
+	photoBinMenu=document.getElementById('photoBinMenu');
+	menuExit=document.getElementById('menuExit');
 	
 	iconTray=document.getElementById('iconTray');
 	thumbnailText=document.getElementById('thumbnailText');
@@ -26,7 +30,9 @@ function boot(){
 	alignLines=document.getElementById('alignLines');
 	frontFlash=document.getElementById('frontFlash');
 	
+	buildCameraLoadingPrompt();
 	buildIcons();
+	buildPhotoBin();
 	setAlignLines();
 	if(verbose) prepVerbose();
 	
@@ -39,6 +45,65 @@ function boot(){
 	pxlRender(runner);
 	//mapPrepGUI();
 	//launchFullscreen(pxlCanvas);
+}
+
+//////////////////////////////////////
+
+function buildCameraLoadingPrompt(){
+	let textDiv=document.getElementById("cameraLoadingText");
+	let html=`
+		<span class="header"> Loading <span id="curLoadingCam">Camera</span></span>
+		<br><span class="detect">[- Finding camera info -]</span>
+		<br><span class="sub">( Occurs once per camera )</span>
+	`;
+	textDiv.innerHTML=html;
+}
+
+function buildPhotoBin(){
+	let html=`
+		<table border=0 cellpadding=0 cellspacing=0 class="menuBody">
+		<tr><td><div class="menuTitle">Photo Bin</div></td></tr>
+		<tr><td height="100%" valign="top" id="menuScroller" class="menuScroller">
+			<div id="photoBinScroller" class="menuScrollerInner">
+				<div class="photoBinEmpty">Photos you take will show up here.</div>
+			</div></td></tr>
+		<tr><td><div class="menuExitButton" onclick="closeActiveMenu(false);">Exit Menu </div></td></tr>
+		</table
+	`;
+	photoBinMenu.innerHTML=html;
+	let parentScroller=document.getElementById('menuScroller');
+	let scroller=document.getElementById('photoBinScroller');
+	scroller.style.height=parentScroller.offsetHeight;
+}
+
+function buildIcons(){
+	let iconAdds=["thumbnailImage"];
+	let iconList=[...document.getElementById("iconTray").children, ...iconAdds.map((i)=>document.getElementById(i))];
+	iconList.map(d=>{
+		let scalar=d.hasAttribute("scale")?parseFloat(d.getAttribute("scale")):1;
+		let size=Math.min(sW,sH)*((d.classList.contains('large')?.12:.07)*(mobile?2.5:1)*scalar);
+		let div=document.getElementById(d);
+		d.style.width=size;
+		d.style.height=size;
+		if(!d.classList.contains('iconNextCamera')) d.style.visibility="visible";
+		if(d.hasAttribute("draw")){
+			let draw=d.getAttribute("draw");
+			let can=document.createElement("canvas");
+			can.width=size;
+			can.height=size;
+			can.classList.add("drop");
+			d.innerHTML="";
+			d.appendChild(can);
+			drawIcon(can, draw, [size,size]);
+			if(draw=="nextCam"){
+				let box=document.createElement("div");
+				box.classList.add("iconNextCameraBox");
+				box.classList.add("drop");
+				d.appendChild(box);
+			}
+		}
+	});
+	thumbnailCanvas=thumbnailImage.children[0];
 }
 
 function prepVerbose(){
@@ -100,97 +165,34 @@ function prepVerbose(){
 	};
 }
 
-function getMouseXY(e){
+//////////////////////////////////////
+
+document.onkeyup=function(e){keyUpCall(e);};
+function keyUpCall(e){
 	e.preventDefault();
-	if(touchScreen==0){
-		mouseX=e.clientX;
-		mouseY=e.clientY;
-	}else{
-		if(e.touches){
-			touch = e.touches[0];
-			mouseX = touch.pageX;
-			mouseY = touch.pageY;
-		}
+	let keyHit=e.keyCode || e.which;
+	// Space
+	if(keyHit == 32){
+		pausePlayback();
 	}
-	pxlMouse.x=(mouseX/sW)*2 - 1;
-	pxlMouse.y=-(mouseY/sH)*2 + 1;
+	// F
+	if(keyHit == 70){
+	}
+	// M
+	if(keyHit == 77){
+	}
+	// R
+	if(keyHit == 82){
+	}
+	// Left
+	if(keyHit == 37){
+	}
+	// Right
+	if(keyHit == 39){
+	}
 }
 
-function mapOnDown(e){
-	e.preventDefault();
-	mouseButton=e.which;
-	xyDeltaData.active=1;
-	xyDeltaData.mode=mouseButton;
-	xyDeltaData.startPos=new THREE.Vector2(mouseX,mouseY);
-	xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-	xyDeltaData.dragCount=0;
-}
-function mapOnMove(e){
-	e.preventDefault();
-	getMouseXY(e);
-	if(xyDeltaData.active==1){
-		xyDeltaData.dragCount++;
-		if(xyDeltaData.dragCount == 8){
-			if(xyDeltaData.latched==0){
-				setCursor("grabbing");
-			}
-			xyDeltaData.latched=1;
-		}
-		xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);		
-		stepShaderValues();
-	}
-}
-function mapOnUp(e){
-	e.preventDefault();
-	
-	xyDeltaData.dragCount++;
-	xyDeltaData.dragTotal+=xyDeltaData.dragCount;
-	xyDeltaData.active=0;
-	xyDeltaData.latched=0;
-	xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-	setCursor("default");
-}
-function mapOnExitMode(){
-	xyDeltaData.startPos=new THREE.Vector2(0,0);
-	xyDeltaData.endPos=new THREE.Vector2(0,0);
-	xyDeltaData.dragTotal=1;
-	
-	xyDeltaData.netDistance[0]=0;
-	xyDeltaData.netDistance[1]=0;
-	xyDeltaData.netDistance[2]=0;
-	xyDeltaData.latchMatrix=null;
-	mouseWheelDelta=0;
-	pxlCamCameraObjLatchOffset=[0,0];
-	pxlCamCameraObjLatchPrev=null;
-}
-function mouseWheel(e){ // Scroll wheel
-	//Ehhhh IE be damned...
-	// ... Bleh ... I'll address issues after MAP is done
-	var delta=Math.sign(e.detail || e.wheelDelta);
-	mouseWheelDelta+=delta;
-	if(pxlCamCameraMode == 2){
-		mouseWheelDelta=Math.max(-10, mouseWheelDelta);
-		if(delta<0){
-			xyDeltaData.netDistance[0]*=.9;
-			xyDeltaData.netDistance[2]*=.9;
-		}else{
-			var blend=.5;
-			objRaycast.setFromCamera(pxlMouse,pxlCamCamera);
-			var rayHits=objRaycast.intersectObjects([geoList['table'][0]]);
-			var objRayCurPos=new THREE.Vector3(xyDeltaData.netDistance[0],xyDeltaData.netDistance[1],xyDeltaData.netDistance[2]);
-			if(rayHits.length > 0){
-				for(var x=0; x<rayHits.length;++x){
-					var obj=rayHits[x].object;
-					objRayCurPos=rayHits[x].point;
-					break;
-				}
-				objRayCurPos.sub(pxlCamCamera.position).multiplyScalar(3).multiplyScalar(-1*(Math.max(0,mouseWheelDelta/3)));
-				xyDeltaData.netDistance[0]=xyDeltaData.netDistance[0]+ objRayCurPos.x;//*blend;
-				xyDeltaData.netDistance[2]=xyDeltaData.netDistance[2]+ objRayCurPos.z;//*blend;
-			}
-		}
-	}
-}
+//////////////////////////////////////
 
 function resizeRenderResolution(){
 	pxlW=(sW=window.innerWidth)*mapResPerc;
@@ -230,74 +232,7 @@ function setCanvasRes(res,setCanvas=true,save=false){
 	pxlRenderStack();
 }
 
-document.onkeyup=function(e){keyUpCall(e);};
-function keyUpCall(e){
-	e.preventDefault();
-	let keyHit=e.keyCode || e.which;
-	// Space
-	if(keyHit == 32){
-		pausePlayback();
-	}
-	// F
-	if(keyHit == 70){
-	}
-	// M
-	if(keyHit == 77){
-	}
-	// R
-	if(keyHit == 82){
-	}
-	// Left
-	if(keyHit == 37){
-	}
-	// Right
-	if(keyHit == 39){
-	}
-}
-
-
-function startTouch(e) {
-	touchScreen=1;
-	var touch = e.touches[0];
-	mouseX = touch.pageX;
-	mouseY = touch.pageY;
-	xyDeltaData.active=1;
-	xyDeltaData.mode=mouseButton;
-	xyDeltaData.startPos=new THREE.Vector2(mouseX,mouseY);
-	xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-	xyDeltaData.dragCount=0;
-}
-
-function doTouch(e) {
-	var touch = e.touches[0];
-	if(typeof(e.touches[1]) !== 'undefined'){
-		var touchTwo = e.touches[1];
-	}
-	mouseX=touch.pageX;
-	mouseY=touch.pageY;
-	
-	if(xyDeltaData.active==1){
-		xyDeltaData.dragCount++;
-		if(xyDeltaData.dragCount == 8){
-			if(xyDeltaData.latched==0){
-				setCursor("grabbing");
-			}
-			xyDeltaData.latched=1;
-		}
-		xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-		stepShaderValues();
-	}
-}
-function endTouch(e) {
-	var touch = e.touches[0];
-	//getMouseXY(e);
-	xyDeltaData.dragCount++;
-	xyDeltaData.dragTotal+=xyDeltaData.dragCount;
-	xyDeltaData.active=0;
-	xyDeltaData.latched=0;
-	xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-	setCursor("default");
-}
+//////////////////////////////////////
 
 function setCursor(cursorType){
 	if(cursorType == "activeLatch"){
@@ -314,40 +249,6 @@ function setCursor(cursorType){
 	document.body.style.cursor=cursorType;
 }
 
-function promptScreen(faderObj, vis, fadeOutLimit=null){
-	if(typeof(faderObj)=="string"){
-		faderObj=document.getElementById(faderObj);
-	}
-	if(faderObj.classList.value.indexOf("fader")<0){
-		faderObj.classList.add("fader");
-	}
-	if(vis){
-		faderObj.classList.remove("visOff");
-		faderObj.classList.add("visOn");
-		if(fadeOutLimit!=null){
-			faderObj.setAttribute("fadeOut", clockTime+fadeOutLimit*1000);
-			fadeOutList.push(faderObj);
-		}
-	}else{
-		faderObj.classList.remove("visOn");
-		faderObj.classList.add("visOff");
-	}
-}
-
-function checkFadeOutList(){
-	if(fadeOutList.length>0){
-		let sliceList=[];
-		fadeOutList.map((d,x)=>{
-			let fadeOutTime=d.getAttribute('fadeOut');
-			clockTime>fadeOutTime&&(sliceList.push(x));
-		});
-		while(sliceList.length>0){
-			let popper=sliceList.pop();
-			promptScreen(fadeOutList[popper],false);
-			fadeOutList.splice(popper,1);
-		}
-	}
-}
 
 //////////////////////////////////////
 
@@ -375,14 +276,6 @@ function mapBootEngine(){
 	//texLoader=new THREE.ImageLoader();
 	
 	/////////////////////////////////////////////
-	//Shadow Maps-
-	pxlCamEngine.shadowMap.enabled=true;
-	if(mobile==3){
-		pxlCamEngine.shadowMap.type=THREE.BasicShadowMap;
-	}else{
-		pxlCamEngine.shadowMap.type=THREE.PCFSoftShadowMap;//PCFScatterShadowMap;//PCFShadowMap;//PCFSoftShadowMap;
-		//pxlCamEngine.shadowMap.type=THREE.PCFSoftShadowMap;
-	}
 	
 	var aspectRatio=pxlCanvas.width/pxlCanvas.height;
 	pxlCamCamera=new THREE.PerspectiveCamera(35,aspectRatio, 1, 3000);
@@ -393,32 +286,6 @@ function mapBootEngine(){
 	
 	var textureList;
 	var transformList;
-	/*
-	var ground=new THREE.PlaneGeometry(400,250,100,100);
-	var groundMat;
-	if(mobile==1){
-		groundMat=new THREE.MeshLambertMaterial();
-	}else{
-		groundMat=new THREE.MeshStandardMaterial();
-	}
-	
-	var groundMesh=new THREE.Mesh(ground,groundMat);
-	groundMesh.material.emissive=new THREE.Color( 0x101010 );
-	groundMesh.material.roughness=.9;
-	groundMesh.rotation.x=-90*(Math.PI/180);
-	groundMesh.position.z=-50;
-	pxlCamScene.add(groundMesh);
-	
-	groundMesh.receiveShadow=true;
-	geoList["table"]=[groundMesh,ground];
-	*/
-	/*
-	var ambLight=new THREE.AmbientLight(0xffffff,.1);
-	pxlCamScene.add(ambLight);
-	
-	var ambLightMask=new THREE.AmbientLight(0xffffff,1);
-	pxlProcessScene.add(ambLightMask);
-	*/
 	
 	webcamVideo=document.getElementById("webcamVideo");
 	webcamVideo.setAttribute("autoplay", "");

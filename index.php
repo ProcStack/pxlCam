@@ -3,11 +3,31 @@
 	$verbose=0;
 	$todoList=<<<EOT
 ==================================================================
+As of February 16th, 2020 -
+ - Generated gui elements and icons
+ - Implemented a photo editor
+To-Dos-
+ - Figure out why wide camera lenses' aspect ratio is shot to hell.
+     Most likely a Three.js scene size issue.
+     The camera videoWidth/videoHeight appears correct
+     Drawing the unadjusted canvas, 1-to-1 of the camera res,
+       Draws the aspect ratio just fine.
+ - Build Camera Class - 'pxlCam_deviceScripts.js' functions
+     Video Media listings
+     Auto-camera res finder
+ - Build Menu Class - For easier bootstrapping in the future
+     Nested menus with back buttons
+     Auto generated fade css classes
+ - Add cookies to maintain camera resolutions for faster loading
+ - Add javascript worker
+     Faster canvas processing
+     ImageData to Blob conversion for download
+==================================================================
 EOT;
 
 	if(isset($_GET['v'])){
 		if(is_numeric($_GET['v'])){
-			$verbose=$_GET['v'];
+			$verbose=$_GET['v']==1?"true":"false";
 		}
 	}
 	if(isset($_GET['m'])){
@@ -21,6 +41,7 @@ EOT;
 			$mobile=1;
 		}
 	}
+	$mobile=$mobile==1?"true":"false";
 	$t=time();
 ?>
 <html>
@@ -32,7 +53,7 @@ If you are digging around in the source, I'm glad others out there do that!
 -->
 <meta name="viewport" content="width=device-width, initial-scale=.85, user-scalable=no"></meta>
 <link rel="stylesheet" href="pxlCamStyle.css">
-<script src="js/map_three.min.js"></script>
+<script src="js/pxlCam_three.min.js"></script>
 <script src="js/EffectComposer.js"></script>
 <script src="js/CopyShader.js"></script>
 <script src="js/RenderPass.js"></script>
@@ -44,14 +65,15 @@ If you are digging around in the source, I'm glad others out there do that!
 <!-- Metal Asylum Local Javascript - map javascript files -->
 <script>
 var mobile=<?php echo $mobile; ?>;
-var verbose=!!<?php echo $verbose; ?>;
+var verbose=<?php echo $verbose; ?>;
 var mapToDoList=`<?php echo $todoList; ?>`;
 </script>
-<script src="js/map_variables.js?q=<?php echo $t; ?>"></script>
-<script src="js/map_boot.js?q=<?php echo $t; ?>"></script>
-<script src="js/map_coreScripts.js?q=<?php echo $t; ?>"></script>
-<script src="js/map_deviceScripts.js?q=<?php echo $t; ?>"></script>
-<script src="js/map_shaderScripts.js?q=<?php echo $t; ?>"></script>
+<script src="js/pxlCam_variables.js?q=<?php echo $t; ?>"></script>
+<script src="js/pxlCam_boot.js?q=<?php echo $t; ?>"></script>
+<script src="js/pxlCam_mouseTouch.js?q=<?php echo $t; ?>"></script>
+<script src="js/pxlCam_coreScripts.js?q=<?php echo $t; ?>"></script>
+<script src="js/pxlCam_deviceScripts.js?q=<?php echo $t; ?>"></script>
+<script src="js/pxlCam_shaderScripts.js?q=<?php echo $t; ?>"></script>
 
 <body onLoad="boot();">
 <div id="verbose" class="verboseBlock"></div>
@@ -74,9 +96,6 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 
 <div id="cameraLoadingBlock" class="cameraLoadingBlock visOff">
 	<div id="cameraLoadingText" class="cameraLoadingText">
-		<span class="header"> Loading <span id="curLoadingCam">Camera</span></span>
-		<br><span class="detect">[- Finding camera info -]</span>
-		<br><span class="sub">( Occurs once per camera )</span>
 	</div>
 </div>
 
@@ -85,10 +104,13 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 <div id="frontFlash" class="frontFlash"></div>
 
 <div id="thumbnailBlock" class="thumbnailBlock">
-	<div id="thumbnailText" class="thumbnailText visOff">
-	</div>
-	<div id="thumbnailImage" class="thumbnailImage visOff" draw="blank" scale="1">
-	</div>
+	<div id="thumbnailText" class="thumbnailText visOff"></div>
+	<div id="thumbnailImage" class="thumbnailImage visOff" onclick="openMenu('photoBinMenu');" draw="blank" scale="1"></div>
+</div>
+
+<div id="menuBlock" class="menuBlock visOff">
+	<div id="menuExit" class="menuExit" onclick="closeActiveMenu(false);"></div>
+	<div id="photoBinMenu" class="photoBinMenu menuParent visOff"></div>
 </div>
 
 </body>

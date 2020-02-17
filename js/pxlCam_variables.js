@@ -7,9 +7,12 @@ var mapResPerc=1;//mobile?.25:.5;
 var mapAutoQuality=1;
 //var loadFullTome=mobile?0:1;
 var loadFullTome=0;
-var cameraLoading,iconTray;
-var alignLines;
-var frontFlash;
+var cameraLoading,iconTray,alignLines,frontFlash,menuExit;
+var menuBlock,photoBinMenu;
+var photoBinObjects=[];
+var activeMenu=null;
+var previousMenu=[]; // For back buttons, nested menus;  Hierarchy - [ parent, ...chilren ]
+var catchNavigatorCalls=false;
 var takeShotTime=0;
 var flashWaitTime=1000;
 var useFlash=false;
@@ -63,6 +66,7 @@ var lightList=[];
 var lightMapList=[];
 var pxlPause=false;
 var renderPause=false;
+var inputActive=true;
 var runner=-1;
 const pi=3.14159265358979;
 
