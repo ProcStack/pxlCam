@@ -20,6 +20,7 @@ var useFrontFlash=false;
 var flashActive=false;
 var delaySaveShot=false;
 var verbBlock,verbFPS,verbDeviceRes,verbCurCam,verbCurCamName,verbPrevCamName,verbMaxCam,verbPaused,verbConsole,verbYaw,verbPitch,verbRoll,verbCamRes,verbCurAngle;
+var verbScriptToggle=true;
 
 var pxlProcessScene=null; // pxlProcessScene.add(processorObj[0]);
 var pxlCanvas,pxlW,pxlH;
@@ -28,28 +29,10 @@ var sH=window.innerHeight;
 var pxlMouse=new THREE.Vector2();
 
 // ========================================
-var mouseX=sW/2;
-var mouseY=sH/2;
-var xyDeltaData={
-	'active':0,
-	'mode':0,
-	'updated':0,
-	'latched':0,
-	'latchedAxis':null,
-	'dragCount':0,
-	'dragTotal':0,
-	'startPos':null, //vec2
-	'prevDeltaPos':[0,0,0], //vec2
-	'endPos':null, //  [x,y] 
-	'latchMatrix':null, // Mat4
-	'netDistance':[0,0,0], //vec2
-	'curDistance':[0,0,0], //vec2
-};
 const firefox=/Firefox/i.test(navigator.userAgent);
 const mouseWheelEvt=(firefox)? "DOMMouseScroll" : "mousewheel" ;
 var mouseWheelDelta=0;
 var mouseButton=0;
-var prevCursor=null;
 const IE = document.all?true:false;
 var touch =0;
 var touchScreen=0;
@@ -96,6 +79,7 @@ const attrObserver=new MutationObserver(attrMutationCallback);
 // Store and run from the higher value
 var camSafeRes=[]; // Keep the safe, dispose of the rest!
 var camSafeResValid=[];
+var camMalformFlip=[];
 var curResId=[];
 var camOddResList=[
 	480,
@@ -155,6 +139,8 @@ var camSafeResFound=false;
 var camSafeResBooting=false;
 var camSafeResBooted=false;
 var camPictureAspect=[1,1];
+var camCheckMalformedRes=50; // Once a camera boots, it will set this value to 0
+var camMalformedCheckMax=40;
 
 // ========================================
 
@@ -171,8 +157,10 @@ var webcamActive=0;
 var webcamList=[];
 var webcamNameList=[];
 
+var pxlCamBootError=false;
 var delayLoadCam=false; // Keep false; ticks on once camera boots initially camera on boot
 var failedBootCount=0;
+var totalFailedBootCount=0;
 var flipHorizontal=false;
 var vidTexture;
 var vidGeo;

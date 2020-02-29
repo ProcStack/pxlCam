@@ -1,18 +1,18 @@
 
-function stepShaderValues(){	
-	let deltaX=xyDeltaData.endPos.x-xyDeltaData.startPos.x;
-	let deltaY=xyDeltaData.startPos.y-xyDeltaData.endPos.y;
-		
+function stepShaderValues(){
 	if(effectMode<2){
+		
+		deltaX=pxlMouse.endPos[0]-pxlMouse.startPos[0];
+		deltaY=pxlMouse.startPos[1]-pxlMouse.endPos[1];
 		//smoothReachDist=runSmartBlur ? Math.max(2, Math.min(smoothReachDistMax, smoothReachDist+deltaX*.002)) : smoothReachDist;
-		darkenImageDist=runDarkenImage ? Math.max(0, Math.min(darkenImageDistMax, darkenImageDist+deltaX*.0002)) : darkenImageDist;
-		edgeReachDist=runEdgeColor ? Math.max(2, Math.min(edgeReachDistMax, edgeReachDist+deltaY*.002)) : edgeReachDist;
+		darkenImageDist=runDarkenImage ? Math.max(0, Math.min(darkenImageDistMax, darkenImageDist+deltaX*(mobile?.04:.02) )) : darkenImageDist;
+		edgeReachDist=runEdgeColor ? Math.max(2, Math.min(edgeReachDistMax, edgeReachDist-deltaY*(mobile?.4:.2) )) : edgeReachDist;
 		
 		filterShader.uniforms.uEdgeReach.value=edgeReachDist;
 		filterShader.uniforms.uDarkenImage.value=darkenImageDist;
 	}else{
-		hueSatch_rotateHue+=deltaX*.0001;
-		hueSatch_flattenMultColor+=deltaY*.0001;
+		hueSatch_rotateHue+=deltaX*(mobile?.04:.001);
+		hueSatch_flattenMultColor+=deltaY*(mobile?.04:.001);
 		
 		filterShader.uniforms.uFlattenScalar.value=hueSatch_flattenMultColor;
 		filterShader.uniforms.uRotateHue.value=hueSatch_rotateHue;
@@ -41,11 +41,12 @@ function nextEffect(){
 		hueSatch_rotateHue=0;
 	}
 	buildShaderPass(true);
+	findPictureAspect();
 }
 function findPictureAspect(save=false){
 	var aspectMult=[1,1];
+	let res=[sW,sH];
 	if(!save){
-		let res=[sW,sH];
 		let safe=[...camSafeRes[webcamActive]];
 		safe=mobile&&sH>sW?[safe[1],safe[0]]:safe;
 		let resAspect=[sW/sH, sH/sW];
@@ -54,7 +55,15 @@ function findPictureAspect(save=false){
 		aspectMult[0]=(resAspect[0]>safeAspect[0]) ? 1 : res[0]/(res[1]*safeAspect[0]) ;
 		aspectMult[1]=(resAspect[0]>safeAspect[0]) ? res[1]/(res[0]*safeAspect[1]) : 1 ;
 	}
+	aspectMult[0]=isNaN(aspectMult[0])?1:aspectMult[0];
+	aspectMult[1]=isNaN(aspectMult[1])?1:aspectMult[1];
 	camPictureAspect=[...aspectMult];
+	
+	if(camMalformFlip[webcamActive]==true){
+		smartBlurShader.uniforms.uMalformX.value=res[0]/res[1];
+	}else{
+		smartBlurShader.uniforms.uMalformX.value=1;
+	}
 	smartBlurShader.uniforms.uResAspectX.value=camPictureAspect[0];
 	smartBlurShader.uniforms.uResAspectY.value=camPictureAspect[1];
 }
@@ -66,7 +75,7 @@ function takeShot(){
 	}
 }
 function saveShot(){
-	let r=camSafeRes[webcamActive];
+	let r=camSafeResValid[webcamActive][0];//camSafeRes[webcamActive];
 	r=mobile && sH>sW?[r[1],r[0]]:r;
 	var cameraRender,cameraCanvas;
 	setCanvasRes(r,true,true); // Renders the scene too	
@@ -168,6 +177,7 @@ function filter_smartBlur(mult=1){
 			"tDiffuse":{type:"t",value:0,texture:null},
 			"uResScaleX":{type:"f",value:1/sW},
 			"uResScaleY":{type:"f",value:1/sH},
+			"uMalformX":{type:"f",value:1},
 			"uResAspectX":{type:"f",value:camPictureAspect[0]},
 			"uResAspectY":{type:"f",value:camPictureAspect[1]},
 		},
@@ -263,6 +273,7 @@ function webcamFragment_smartBlur(smoothReach){
 	var retFrag= `
 		precision mediump float;
 		uniform sampler2D	tDiffuse;
+		uniform float		uMalformX;
 		uniform float		uResAspectX;
 		uniform float		uResAspectY;
 		uniform float		uResScaleX;
@@ -326,6 +337,7 @@ function webcamFragment_smartBlur(smoothReach){
 		void main( void ){
 			vec2 uv = vUv;
 			uv=(uv-.5)*vec2(uResAspectX,uResAspectY)+.5;
+			uv.x*=uMalformX;
 			
 			vec4 Cd=texture2D(tDiffuse,uv);
 			vec4 smartBlurCd=vec4( smartBlurRGB(tDiffuse, uv, vec2(uResScaleX,uResScaleY), .1), 1.0);

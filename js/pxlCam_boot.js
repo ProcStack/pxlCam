@@ -1,21 +1,15 @@
 'use strict';
 
-function boot(){
-	if(verbose){
-		console.log(mapToDoList);
-		console.log("Verbose console logs are ON");
-	}
+function init(){
+	pxlMouse=new MouseController();
+	pxlMouse.init();
+	pxlMouse.sW=sW;
+	pxlMouse.sH=sH;
+	pxlMouse.mouseDragEval="stepShaderValues()"; // On mouseDrag event
+	pxlMouse.touchMoveEval="stepShaderValues()"; // On touchMove event
+
 	window.addEventListener('onbeforeunload', stopStreams);
-	document.onmousemove=function(e){mapOnMove(e);};
-	document.onmousedown=function(e){mapOnDown(e);};
-	document.onmouseup=function(e){mapOnUp(e);};
-    //document.addEventListener(mouseWheelEvt, function(e) {mouseWheel(e);}, false)
 	window.onresize=function(e){resizeRenderResolution();};
-	
-	document.addEventListener('touchstart', function(e) {startTouch(e);}, false);
-	document.addEventListener('touchmove', function(e) {doTouch(e);}, false);
-	document.addEventListener('touchend', function(e) {endTouch(e);}, false);
-	
 	window.addEventListener('deviceorientation', devicePoseData);
 	//window.addEventListener('orientationchange', devicePoseChange); // Don't know when this ever fires, docs seem like it should run tho
 	
@@ -43,6 +37,7 @@ function boot(){
 	pxlCanvas.height=window.innerHeight;
 	mapBootEngine();
 	pxlRender(runner);
+	pxlMouse.inputActive=true;
 	//mapPrepGUI();
 	//launchFullscreen(pxlCanvas);
 }
@@ -107,6 +102,9 @@ function buildIcons(){
 }
 
 function prepVerbose(){
+	console.log(mapToDoList);
+	console.log("Verbose console logs are ON");
+
 	verbBlock=document.getElementById('verbose');
 	let innerVerbose=`
 		<div id="verbose_fps"></div>
@@ -165,6 +163,16 @@ function prepVerbose(){
 	};
 }
 
+function verbFunction(){
+ //stepThumbnailRebuild();
+ verbScriptToggle=!verbScriptToggle;
+ //findPictureAspect(verbScriptToggle);
+ //let res=(verbScriptToggle?[sW,sH]:[sH,sH]);
+//setCanvasRes(res);
+
+	smartBlurShader.uniforms.uResAspectX.value=1;
+	smartBlurShader.uniforms.uResAspectY.value=1;
+}
 //////////////////////////////////////
 
 document.onkeyup=function(e){keyUpCall(e);};
@@ -197,7 +205,11 @@ function keyUpCall(e){
 function resizeRenderResolution(){
 	pxlW=(sW=window.innerWidth)*mapResPerc;
 	pxlH=(sH=window.innerHeight)*mapResPerc;
+	pxlMouse.sW=sW;
+	pxlMouse.sH=sH;
 	if(verbose) verbDeviceRes.innerHTML=sW+"x"+sH;
+	webcamVideo.setAttribute("width",sW);
+	webcamVideo.setAttribute("height",sH);
 	setCanvasRes([sW,sH]);
 	buildIcons();
 }
@@ -224,6 +236,11 @@ function setCanvasRes(res,setCanvas=true,save=false){
 	});
 	buildShaderPass(true, (save?((res[0]+res[1])/(sW+sH)):1) );
 	
+	if(camMalformFlip[webcamActive]==true){
+		smartBlurShader.uniforms.uMalformX.value=res[0]/res[1];
+	}else{
+		smartBlurShader.uniforms.uMalformX.value=1;
+	}
 	smartBlurShader.uniforms.uResScaleX.value=1/res[1];
 	smartBlurShader.uniforms.uResScaleY.value=1/res[0];
 	filterShader.uniforms.uResScaleX.value=1/res[0];
@@ -231,24 +248,6 @@ function setCanvasRes(res,setCanvas=true,save=false){
 	
 	pxlRenderStack();
 }
-
-//////////////////////////////////////
-
-function setCursor(cursorType){
-	if(cursorType == "activeLatch"){
-		if(mouseButton==0){
-			cursorType="grab";
-		}else if(mouseButton==1){
-			cursorType="grabbing";
-		}else if(mouseButton==2){
-			cursorType="all-scroll";
-		}
-	}else{
-		prevCursor=null;
-	}
-	document.body.style.cursor=cursorType;
-}
-
 
 //////////////////////////////////////
 
@@ -263,7 +262,7 @@ function mapBootEngine(){
 	//pxlCamEngine.autoClear=false;
 	pxlCamEngine.setClearColor(0x000000);
 	pxlCamEngine.setPixelRatio(1);//window.devicePixelRatio);
-	pxlCamEngine.setSize(pxlW/mapResPerc, pxlH/mapResPerc);
+	pxlCamEngine.setSize(pxlW, pxlH);
 	//pxlCamEngine.gammaOutput=true;
 	
 	pxlCamRenderTarget=new THREE.WebGLRenderTarget(pxlW,pxlH,{
@@ -291,6 +290,8 @@ function mapBootEngine(){
 	webcamVideo.setAttribute("autoplay", "");
 	webcamVideo.setAttribute("muted", "");
 	webcamVideo.setAttribute("playsinline", "");
+	webcamVideo.setAttribute("width",sW);
+	webcamVideo.setAttribute("height",sH);
 	
 	if(verbose){
 		webcamVideo.onloadedmetadata=()=>{

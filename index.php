@@ -3,11 +3,14 @@
 	$verbose=0;
 	$todoList=<<<EOT
 ==================================================================
-As of February 16th, 2020 -
- - Generated gui elements and icons
- - Implemented a photo editor
+As of February 29th, 2020 -
+ - Converted mouse/touch functionality to a self contained class constructor
 To-Dos-
  - Figure out why wide camera lenses' aspect ratio is shot to hell.
+     Implemented a system to read pixel information on areas of the screen
+	   This is used to determine if the resolution should be corrected
+	   Corrections calcualted through -
+	     pxlCam_shaderScripts.js; findPictureAspect(); camMalformFlip[webcamActive]
      Most likely a Three.js scene size issue.
      The camera videoWidth/videoHeight appears correct
      Drawing the unadjusted canvas, 1-to-1 of the camera res,
@@ -18,7 +21,13 @@ To-Dos-
  - Build Menu Class - For easier bootstrapping in the future
      Nested menus with back buttons
      Auto generated fade css classes
+ - Build Mouse/Touch Class - For easier bootstrapping in the future
+     Maintain Current/Previous position
+     Calculate velocity information
+     Developer set functions for eval for
+       mouseDown/touchStart, mouseDrag/touchMove, mouseUp/touchEnd
  - Add cookies to maintain camera resolutions for faster loading
+ - Add cookies to find website crashes to reduce quality on load
  - Add javascript worker
      Faster canvas processing
      ImageData to Blob conversion for download
@@ -48,11 +57,31 @@ EOT;
 <head>
 </head>
 <!--
-Created by Kevin Edzenga; September 2019 -- 
-If you are digging around in the source, I'm glad others out there do that!
+Created by Kevin Edzenga; February 2020 -- 
+If you are digging around in the source, I'm glad others do too!
+
+To-Dos-
+<?php echo $todoList; ?>
+
+Things of importance --
+pxlCam_mouseTouch.js
+  Contains an isolated mouse and touch controller class
+  Maintains current/previous positions
+  Calculates mouse velocity
+  Evalutates desired functions as per mouseDown/touchStart, mouseDrag/touchMove, mouseUp/touchEnd
+pxlCam_deviceScripts.js
+  Contains webcam/video media functions to find maximum camera resolutions
+  Stores a safe display resolution near the screen resolution and all found resolutions, with fall back to 640x480 should all else fail
+pxlCam_coreScripts.js
+  UI element building through resolution dependant icons using canvas elements and draws the icons dynamically
+  Currently no support for external images to be displayed
+pxlCam_shaderScripts.js
+  All ThreeJS OpenGL shaders stored here
+  ThreeJS composer options
+  Convert and save a given canvas with a function, see `takeShot()`
 -->
-<meta name="viewport" content="width=device-width, initial-scale=.85, user-scalable=no"></meta>
-<link rel="stylesheet" href="pxlCamStyle.css">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"></meta>
+<link rel="stylesheet" href="pxlCamStyle.css?q=<?php echo $t; ?>">
 <script src="js/pxlCam_three.min.js"></script>
 <script src="js/EffectComposer.js"></script>
 <script src="js/CopyShader.js"></script>
@@ -75,7 +104,7 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 <script src="js/pxlCam_deviceScripts.js?q=<?php echo $t; ?>"></script>
 <script src="js/pxlCam_shaderScripts.js?q=<?php echo $t; ?>"></script>
 
-<body onLoad="boot();">
+<body onLoad="init();">
 <div id="verbose" class="verboseBlock"></div>
 
 <video id="webcamVideo" style="position:absolute; top:0px;left:0px;z-index:10;display:none;"></video>
@@ -91,7 +120,7 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 		<div id="icon-saveShotInnerDot" class="iconTakePhotoInnerDot"></div>
 	</div>
 	<div id="icon-nextCamera" class="iconParent iconNextCamera drop" onClick="nextCamera();" draw="nextCam" scale="1"></div>
-	<?php if($verbose==1){ ?><div id="icon-nextRes" class="iconParent iconNextRes drop" onClick="nextRes();" draw="nextRes" scale="1"></div><?php } ?>
+	<?php if($verbose){ ?><div id="icon-nextRes" class="iconParent iconNextRes drop" onClick="verbFunction();" draw="nextRes" scale="1"></div><?php } ?>
 </div>
 
 <div id="cameraLoadingBlock" class="cameraLoadingBlock visOff">

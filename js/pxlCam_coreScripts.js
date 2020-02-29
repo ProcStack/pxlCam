@@ -1,6 +1,6 @@
 
 function openMenu(divName){
-	inputActive=false;
+	pxlMouse.inputActive=false;
 	let bootMenu=document.getElementById(divName);
 	if(activeMenu!=null){
 		closeActiveMenu(true);
@@ -25,7 +25,8 @@ function closeActiveMenu(keepBlockVisible){
 	if(!keepBlockVisible){
 		promptFader(menuBlock, false);
 		setTimeout(()=>{menuBlock.style.zIndex=0;}, 1000);
-		inputActive=true;
+		
+		pxlMouse.inputActive=true;
 		/*if(catchNavigatorCalls && mobile){
 			window.removeEventListener('hardwareBackPress', backPress);
 		}*/
@@ -36,6 +37,7 @@ function backPress(e){
 	return false;
 }
 
+
 function addPhotoBinEntry(obj, res, imageData, urlObject, fileName, fileSize){
 	let bin=document.getElementById(obj);
 	let curCount=0;
@@ -43,12 +45,15 @@ function addPhotoBinEntry(obj, res, imageData, urlObject, fileName, fileSize){
 		curCount=parseInt(bin.getAttribute("listCount"));
 		curCount+=1;
 	}else{
-		console.log("hit");
 		bin.setAttribute("listCount", 0);
 		bin.innerHTML="";
 	}
 	bin.setAttribute("listCount",curCount);
 	var entry=new PhotoBinEntry(curCount, bin, res, imageData, urlObject, fileName, fileSize);
+
+			photoBinObjects.map((e)=>{
+				e.updateThumbnail();
+			});
 	photoBinObjects.push(entry);
 }
 function updatePhotoBinButton(entryId,buttonId,fileSizeId,scalarId){
@@ -61,6 +66,12 @@ function downloadPhotoBinEntry(entryId){
 	curBinEntry.download();
 }
 
+var curRebuild=0;
+function stepThumbnailRebuild(){
+	photoBinObjects[curRebuild].updateThumbnail();
+	curRebuild=(curRebuild+1)%photoBinObjects.length;
+}
+
 class PhotoBinEntry{
 	constructor(id, parent, res, imageData, urlObject, fileName, fileSize){
 		this.entryId=id;
@@ -71,10 +82,10 @@ class PhotoBinEntry{
 		this.fileName=fileName;
 		// Percent Scale : [ Res[W,H], URL.createObjectURL, Resolution File Name, Raw File Size
 		this.scalarArray={
-			10:null,
-			25:null,
 			50:null,
+			65:null,
 			75:null,
+			85:null,
 			100:[[...res],urlObject,fileName,this.getDisplaySize(fileSize)]
 		};
 		this.activeScale=100;
@@ -99,7 +110,7 @@ class PhotoBinEntry{
 			let key=scalarKeys[x];
 			if(this.scalarArray[key]==null){
 				let keyArr=[];
-				keyArr.push( [this.res[0]*(key/100),this.res[1]*(key/100)] ); // Resolution
+				keyArr.push( [parseInt(this.res[0]*(key/100)),parseInt(this.res[1]*(key/100))] ); // Resolution
 				keyArr.push( null ); // URL Object
 				keyArr.push( null ); // File Name
 				keyArr.push( null ); // File Size
@@ -116,34 +127,32 @@ class PhotoBinEntry{
 					</table>
 				</div>
 				<div class="entryButton" onclick="downloadPhotoBinEntry(`+this.entryId+`);">
-					Download - <span id="`+this.domId+`_Download">`+this.downloadText+`</span>
+					Download<br><span id="`+this.domId+`_Download">`+this.downloadText+`</span>
 				</div>
 			</div>
 		`;
 		this.html=html;
 		this.parent.innerHTML=this.html+this.parent.innerHTML;
-		this.canvasThumbnail=document.getElementById(this.domId+"_thumbnailCanvas");
+		this.canvasThumbnail=this.domId+"_thumbnailCanvas";
+		let thCanvas=document.getElementById(this.domId+"_thumbnailCanvas");
 		let parent=document.getElementById(this.domId+"_thumbnailParent");
 		let pres=[ parent.offsetWidth, parent.offsetHeight ];
 		let scaleRes=this.res[0]/this.res[1];
 		pres[0]=pres[1]*scaleRes;
 		
-		this.canvasThumbnail.width=pres[0];
-		this.canvasThumbnail.height=pres[1];
+		thCanvas.width=pres[0];
+		thCanvas.height=pres[1];
 		
 		this.canvas=document.createElement('canvas');
 		this.canvas.width=this.res[0];
 		this.canvas.height=this.res[1];
 		let ctx=this.canvas.getContext('2d');
-		let thumbCtx=this.canvasThumbnail.getContext('2d');
+		let thumbCtx=thCanvas.getContext('2d');
 		let cImage=new Image;
 		cImage.onload=()=>{
 			ctx.drawImage(cImage,0,0);
 			thumbCtx.drawImage(cImage,0,0, ...this.res, 0,0, ...pres);
-			this.canvasThumbnailData=this.canvasThumbnail.toDataURL("image/png");
-			photoBinObjects.map((e)=>{
-				e.updateThumbnail();
-			});
+			this.canvasThumbnailData=thCanvas.toDataURL("image/png");
 		};
 		cImage.src=this.imageData;
 	}
@@ -154,14 +163,15 @@ class PhotoBinEntry{
 		return this.remove();
 	}
 	updateThumbnail(){
-		let thumbCtx=this.canvasThumbnail.getContext('2d');
-		console.log(thumbCtx);
-		console.log(this.canvasThumbnailData);
-		let img=new Image;
-		img.onload=()=>{
-			thumbCtx.drawImage(img,0,0);
-		};
-		img.src=this.canvasThumbnailData;
+		let thCanvas=document.getElementById(this.canvasThumbnail);
+		if(thCanvas){
+		  let thumbCtx=thCanvas.getContext('2d');
+			let img=new Image;
+			img.onload=()=>{
+				thumbCtx.drawImage(img,0,0);
+			};
+			img.src=this.canvasThumbnailData;
+		}
 	}
 	download(scale){
 		let blob=atob(this.scalarArray[this.activeScale][1].split(',')[1]);
@@ -485,11 +495,27 @@ function pxlRender(){
 		if(failedBootCount>5){ 
 			delayLoadCam=true;
 			failedBootCount=0;
-			nextCamera();
+			totalFailedBootCount+=1;
+			if(totalFailedBootCount>5){
+				pxlPause=true;
+				pxlCamBootError=true;
+				return;
+			}
+			if(isNaN(webcamActive)){
+				findMediaDevices();
+			}else{
+				nextCamera();
+			}
 		}else{
 			delayLoadCam=false;
 			findPictureAspect();
 			bootCamera();
+		}
+	}
+	if(camCheckMalformedRes<camMalformedCheckMax && mobile){
+		camCheckMalformedRes+=1;
+		if(camCheckMalformedRes==camMalformedCheckMax){
+			detectMalformedResolution();
 		}
 	}
 	

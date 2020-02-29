@@ -1,153 +1,210 @@
-
-//////////////////////////////////////
-
-function getMouseXY(e){
-	e.preventDefault();
-	if(touchScreen==0){
-		mouseX=e.clientX;
-		mouseY=e.clientY;
-	}else{
-		if(e.touches){
-			touch = e.touches[0];
-			mouseX = touch.pageX;
-			mouseY = touch.pageY;
-		}
-	}
-	pxlMouse.x=(mouseX/sW)*2 - 1;
-	pxlMouse.y=-(mouseY/sH)*2 + 1;
-}
-
-function mapOnDown(e){
-	e.preventDefault();
-	mouseButton=e.which;
-	if(inputActive){
-		xyDeltaData.active=1;
-		xyDeltaData.mode=mouseButton;
-		xyDeltaData.startPos=new THREE.Vector2(mouseX,mouseY);
-		xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-		xyDeltaData.dragCount=0;
-	}
-}
-function mapOnMove(e){
-	e.preventDefault();
-	getMouseXY(e);
-	if(inputActive){
-		if(xyDeltaData.active==1){
-			xyDeltaData.dragCount++;
-			if(xyDeltaData.dragCount == 8){
-				if(xyDeltaData.latched==0){
-					setCursor("grabbing");
-				}
-				xyDeltaData.latched=1;
-			}
-			xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);		
-			stepShaderValues();
-		}
-	}
-}
-function mapOnUp(e){
-	e.preventDefault();
-	
-	if(inputActive){
-		xyDeltaData.dragCount++;
-		xyDeltaData.dragTotal+=xyDeltaData.dragCount;
-		xyDeltaData.active=0;
-		xyDeltaData.latched=0;
-		xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-	}
-	setCursor("default");
-}
-function mapOnExitMode(){
-	if(inputActive){
-		xyDeltaData.startPos=new THREE.Vector2(0,0);
-		xyDeltaData.endPos=new THREE.Vector2(0,0);
-		xyDeltaData.dragTotal=1;
+var pxlMouse=null;
+class MouseController{
+	constructor( mouseDDUEvals=['','',''], wheelEval='', touchSME=['','','']){
+		this.bootTime=new Date().getTime();
+		let sW=window.innerWidth;
+		let sH=window.innerHeight;
+		this.sW=sW;
+		this.sH=sH;
+		this.touchScreen=false;
+		this.x=sW*.5;
+		this.y=sH*.5;
+		this.deltaX=0;
+		this.deltaY=0;
+		this.wheelDelta=0;
 		
-		xyDeltaData.netDistance[0]=0;
-		xyDeltaData.netDistance[1]=0;
-		xyDeltaData.netDistance[2]=0;
-		xyDeltaData.latchMatrix=null;
-		mouseWheelDelta=0;
-		pxlCamCameraObjLatchOffset=[0,0];
-		pxlCamCameraObjLatchPrev=null;
+		const firefox=/Firefox/i.test(navigator.userAgent);
+		this.mouseWheelEvt=(firefox)? "DOMMouseScroll" : "mousewheel" ;
+		this.button=0;
+		this.inputActive=false;
+		this.isDown=false;
+		this.startPos=[0,0];
+		this.endPos=[0,0];
+		this.dragCount=0;
+		this.dragTotal=0;
+		this.latched=false;
+		
+		this.modeCount=3;
+		this.mode=0;
+		this.netDistance=new Array(this.modeCount).fill(0);
+		
+		this.mouseDownEval=mouseDDUEvals[0];
+		this.mouseDragEval=mouseDDUEvals[1];
+		this.mouseUpEval=mouseDDUEvals[2];
+		this.mouseWheelEval=wheelEval;
+		this.touchStartEval=touchSME[0];
+		this.touchMoveEval=touchSME[1];
+		this.touchEndEval=touchSME[2];
 	}
-}
-function mouseWheel(e){ // Scroll wheel
-	//Ehhhh IE be damned...
-	// ... Bleh ... I'll address issues after MAP is done
-	var delta=Math.sign(e.detail || e.wheelDelta);
-	mouseWheelDelta+=delta;
-	if(pxlCamCameraMode == 2){
-		mouseWheelDelta=Math.max(-10, mouseWheelDelta);
-		if(delta<0){
-			xyDeltaData.netDistance[0]*=.9;
-			xyDeltaData.netDistance[2]*=.9;
+	init(){
+		document.onmousedown=function(e){pxlMouse.mapOnDown(e);};
+		document.onmousemove=function(e){pxlMouse.mapOnMove(e);};
+		document.onmouseup=function(e){pxlMouse.mapOnUp(e);};
+		document.addEventListener('touchstart', function(e) {pxlMouse.startTouch(e);}, false);
+		document.addEventListener('touchmove', function(e) {pxlMouse.doTouch(e);}, false);
+		document.addEventListener('touchend', function(e) {pxlMouse.endTouch(e);}, false);
+		document.addEventListener(pxlMouse.mouseWheelEvt, function(e) {pxlMouse.mouseWheel(e);}, false)
+	}
+	get active(){
+		return this.inputActive;
+	}
+	set active(state){
+		this.inputActive=!!state;
+	}
+	setCursor(cursorType="activeLatch"){
+		if(cursorType == "activeLatch"){
+			if(this.button==0){
+				cursorType="grab";
+			}else if(this.button==1){
+				cursorType="grabbing";
+			}else if(this.button==2){
+				cursorType="all-scroll";
+			}
+		}
+		document.body.style.cursor=cursorType;
+	}
+	//////////////////////////////////////
+	getMouseXY(e){
+		e.preventDefault();
+		let curX=1;
+		let curY=1;
+		if(!this.touchScreen){
+			curX=e.clientX;
+			curY=e.clientY;
 		}else{
-			var blend=.5;
-			objRaycast.setFromCamera(pxlMouse,pxlCamCamera);
-			var rayHits=objRaycast.intersectObjects([geoList['table'][0]]);
-			var objRayCurPos=new THREE.Vector3(xyDeltaData.netDistance[0],xyDeltaData.netDistance[1],xyDeltaData.netDistance[2]);
-			if(rayHits.length > 0){
-				for(var x=0; x<rayHits.length;++x){
-					var obj=rayHits[x].object;
-					objRayCurPos=rayHits[x].point;
-					break;
-				}
-				objRayCurPos.sub(pxlCamCamera.position).multiplyScalar(3).multiplyScalar(-1*(Math.max(0,mouseWheelDelta/3)));
-				xyDeltaData.netDistance[0]=xyDeltaData.netDistance[0]+ objRayCurPos.x;//*blend;
-				xyDeltaData.netDistance[2]=xyDeltaData.netDistance[2]+ objRayCurPos.z;//*blend;
+			if(e.touches){
+				touch = e.touches[0];
+				curX = touch.pageX;
+				curY = touch.pageY;
 			}
 		}
+		this.x=(curX/this.sW)*2 - 1;
+		this.y=-(curY/this.sH)*2 + 1;
 	}
-}
-
-//////////////////////////////////////
-
-function startTouch(e) {
-	touchScreen=1;
-	var touch = e.touches[0];
-	mouseX = touch.pageX;
-	mouseY = touch.pageY;
-	if(inputActive){
-		xyDeltaData.active=1;
-		xyDeltaData.mode=mouseButton;
-		xyDeltaData.startPos=new THREE.Vector2(mouseX,mouseY);
-		xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-		xyDeltaData.dragCount=0;
+	calculateDelta(){
+		this.deltaX=this.endPos[0]-this.startPos[0];
+		this.deltaY=this.startPos[1]-this.endPos[1];
 	}
-}
-
-function doTouch(e) {
-	var touch = e.touches[0];
-	if(typeof(e.touches[1]) !== 'undefined'){
-		var touchTwo = e.touches[1];
-	}
-	mouseX=touch.pageX;
-	mouseY=touch.pageY;
-	
-	if(inputActive){
-		if(xyDeltaData.active==1){
-			xyDeltaData.dragCount++;
-			if(xyDeltaData.dragCount == 8){
-				if(xyDeltaData.latched==0){
-					setCursor("grabbing");
-				}
-				xyDeltaData.latched=1;
-			}
-			xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
-			stepShaderValues();
+	mapOnDown(e){
+		if(this.inputActive){
+			e.preventDefault();
+			this.button=e.which;
+			this.mode=this.button;
+			this.deltaX=0;
+			this.deltaY=0;
+			this.getMouseXY(e);
+			this.startPos=[this.x,this.y];
+			this.endPos=[this.x,this.y];
+			this.dragCount=0;
+			this.isDown=true;
+			eval(this.mouseDownEval);
 		}
 	}
-}
-function endTouch(e) {
-	var touch = e.touches[0];
-	//getMouseXY(e);
-	if(inputActive){
-		xyDeltaData.dragCount++;
-		xyDeltaData.dragTotal+=xyDeltaData.dragCount;
-		xyDeltaData.active=0;
-		xyDeltaData.latched=0;
-		xyDeltaData.endPos=new THREE.Vector2(mouseX,mouseY);
+	mapOnMove(e){
+		if(this.inputActive && this.isDown){
+			e.preventDefault();
+			this.getMouseXY(e);
+			this.dragCount++;
+			if(this.dragCount == 8){
+				if(!this.latched){
+					this.setCursor("grabbing");
+				}
+				this.latched=true;
+			}
+			this.endPos=[this.x,this.y];
+			this.calculateDelta();
+			eval(this.mouseDragEval);
+		}
 	}
-	setCursor("default");
+	mapOnUp(e){
+		if(this.inputActive && this.isDown){
+			e.preventDefault();
+			this.dragCount++;
+			this.dragTotal+=this.dragCount;
+			this.latched=0;
+			this.isDown=false;
+			this.endPos=[this.x,this.y];
+			this.setCursor("grab");//("default");
+			eval(this.mouseUpEval);
+		}
+	}
+	mouseWheel(e){ // Scroll wheel -- set up for a ThreeJS rayCastObject, which isn't be used right now
+		//Ehhhh IE be damned...
+		if(this.inputActive){
+			let delta=Math.sign(e.detail || e.wheelDelta);
+			this.wheelDelta+=delta;
+			/*if(pxlCamCameraMode == 2){
+				this.wheelDelta=Math.max(-10, this.wheelDelta);
+				if(delta<0){
+					this.netDistance[0]*=.9;
+					this.netDistance[2]*=.9;
+				}else{
+					let blend=.5;
+					objRaycast.setFromCamera(pxlMouse,pxlCamCamera);
+					let rayHits=objRaycast.intersectObjects([geoList['table'][0]]);
+					let objRayCurPos=new THREE.Vector3(this.netDistance[0],this.netDistance[1],this.netDistance[2]);
+					if(rayHits.length > 0){
+						for(let x=0; x<rayHits.length;++x){
+							let obj=rayHits[x].object;
+							objRayCurPos=rayHits[x].point;
+							break;
+						}
+						objRayCurPos.sub(pxlCamCamera.position).multiplyScalar(3).multiplyScalar(-1*(Math.max(0,this.wheelDelta/3)));
+						this.netDistance[0]=this.netDistance[0]+ objRayCurPos.x;//*blend;
+						this.netDistance[2]=this.netDistance[2]+ objRayCurPos.z;//*blend;
+					}
+				}
+			}*/
+			eval(this.mouseWheelEval);
+		}
+	}
+	//////////////////////////////////////
+	startTouch(e) {
+		if(this.inputActive){
+			this.touchScreen=true;
+			let touch=e.touches[0];
+			this.x=touch.pageX;
+			this.y=touch.pageY;
+			this.mode=this.button;
+			this.getMouseXY(e);
+			this.startPos=[this.x,this.y];
+			this.endPos=[this.x,this.y];
+			this.deltaX=0;
+			this.deltaY=0;
+			this.dragCount=0;
+			this.isDown=true;
+			eval(this.touchStartEval);
+		}
+	}
+	doTouch(e) {
+		if(this.inputActive && this.isDown){
+			let touch=e.touches[0];
+			let touchTwo=null
+			if(typeof(e.touches[1]) !== 'undefined'){
+				touchTwo = e.touches[1];
+			}
+			this.x=touch.pageX;
+			this.y=touch.pageY;
+		
+			this.dragCount++;
+			if(this.dragCount == 8){
+				this.latched=true;
+			}
+			this.getMouseXY(e);
+			this.endPos=[this.x,this.y];
+			this.calculateDelta();
+			eval(this.touchMoveEval);
+		}
+	}
+	endTouch(e) {
+		if(this.inputActive && this.isDown){
+			let touch = e.touches[0];
+			this.dragCount++;
+			this.dragTotal+=this.dragCount;
+			this.latched=false;
+			this.isDown=false;
+			this.endPos=[this.x,this.y];
+			eval(this.touchEndEval);
+		}
+	}
 }

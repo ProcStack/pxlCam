@@ -60,7 +60,9 @@ function nextCamera(){ // Delay boot, hoping this can prevent the delays in came
 			verbCurCam.innerText=webcamActive+1;
 			verbCurCamName.innerText=(webcamActive+1)+" - "+webcamNameList[webcamActive];
 		}
+		
 		stopStreams();
+		findPictureAspect();
 		
 		if(camSafeRes[webcamActive]!=null){
 			delayLoadCam=true;
@@ -73,11 +75,21 @@ function bootCamera(){
 		if( navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
 			var cons;
 			var verb="";
-			var cons={ video:{"deviceId":webcamList[webcamActive], "width":{"exact":camSafeRes[webcamActive][0]}, "height":{"exact":camSafeRes[webcamActive][1]}}, audio:false};
+			var res=[...camSafeRes[webcamActive]];
+			var videoConstraints={"deviceId":webcamList[webcamActive], "width":{"exact":res[0]}, "height":{"exact":res[1]}};
+			if(totalFailedBootCount==2){
+				videoConstraints={"deviceId":webcamList[webcamActive], "width":{"exact":res[0]}};
+			}else if(totalFailedBootCount==3){
+				videoConstraints={"deviceId":webcamList[webcamActive], "height":{"exact":res[1]}};
+			}else if(totalFailedBootCount==4){
+				videoConstraints={"deviceId":webcamList[webcamActive]};
+			}
+
+			var cons={ video:videoConstraints, audio:false};
 			//var cons={ video:{"deviceId":webcamList[webcamActive], "width":{"exact":1920}}, audio:false};
 				navigator.mediaDevices.getUserMedia(cons).then( function success(stream) {
-					webcamVideo.setAttribute("width",camSafeRes[webcamActive][0]);
-					webcamVideo.setAttribute("height",camSafeRes[webcamActive][1]);
+					//webcamVideo.setAttribute("width",camSafeRes[webcamActive][0]);
+					//webcamVideo.setAttribute("height",camSafeRes[webcamActive][1]);
 					window.stream=stream;
 					window.track=stream.getVideoTracks()[0];
 					webcamVideo.srcObject=stream;
@@ -107,6 +119,7 @@ function bootCamera(){
 					failedBootCount=0;
 				}).then(()=>{
 					findPictureAspect();
+					camCheckMalformedRes=0;
 					if(renderPause==true){
 						renderPause=false;
 						let curTime=Date.now();
@@ -129,41 +142,44 @@ function bootCamera(){
 }
 
 function checkMediaRes(){
-	var r=camResCheckList.pop();//camResCheckList[camResIttr];
-	//if(verbose) console.log(r);
-	var cons={ video:{"deviceId":{"exact":webcamList[webcamActive]}, "width":{"exact":r}}, audio:false};
-	navigator.mediaDevices.getUserMedia(cons).then( function success(stream) {
-			//window.stream=stream;
-			//webcamVideo.srcObject=stream;
-			let curCamName=stream.getVideoTracks()[0].label;
-			if(curCamName==webcamNameList[webcamActive]){
-				camSafeRes[webcamActive]=[ Math.max(camSafeRes[webcamActive][0], stream.getVideoTracks()[0].getSettings().width), Math.max(camSafeRes[webcamActive][1], stream.getVideoTracks()[0].getSettings().height) ];
-				camSafeResValid[webcamActive].push([ stream.getVideoTracks()[0].getSettings().width, stream.getVideoTracks()[0].getSettings().height ]);
-			}
-			return stream;
-	}).catch( (err)=>{ // Overload Error most likely - Failed to set camera to desired resolution
-	}).then((stream)=>{
-		camResIttr+=1;
-		if(camResCheckList.length==0){
-				stopStreams(stream);
-				camSafeResFound=true;
-				delayLoadCam=true;
-				promptFader(cameraLoading, false);
-				if(verbose){
-					let verb='Found Resolutions - '
-					for(var x=0; x<camSafeResValid[webcamActive].length;++x){
-						verb+=(x%4==0?"<br>":'')+" ["+camSafeResValid[webcamActive][x][0]+","+camSafeResValid[webcamActive][x][1]+"] ";
-					}
-					verb+="<br> Attempting Resolution : "+ camSafeRes[webcamActive][0] + " x " + camSafeRes[webcamActive][1];
-					verb+="<br> Booting Cam "+(webcamActive+1)+"/"+webcamList.length+" - "+webcamNameList[webcamActive];
-					verbConsole.innerHTML+=verb;
+	var r=camResCheckList.pop();
+	if(!isNaN(webcamActive)){
+		var cons={ video:{"deviceId":{"exact":webcamList[webcamActive]}, "width":{"exact":r}}, audio:false};
+		navigator.mediaDevices.getUserMedia(cons).then( function success(stream) {
+				let curCamName=stream.getVideoTracks()[0].label;
+				if(curCamName==webcamNameList[webcamActive]){
+					/*if(stream.getVideoTracks()[0].getSettings().width>sW && stream.getVideoTracks()[0].getSettings().height>sH){
+						camSafeRes[webcamActive]=[ Math.max(camSafeRes[webcamActive][0], stream.getVideoTracks()[0].getSettings().width), Math.max(camSafeRes[webcamActive][1], stream.getVideoTracks()[0].getSettings().height) ];
+					}*/
+					camSafeRes[webcamActive]=[ Math.max(camSafeRes[webcamActive][0], stream.getVideoTracks()[0].getSettings().width), Math.max(camSafeRes[webcamActive][1], stream.getVideoTracks()[0].getSettings().height) ];
+					
+					camSafeResValid[webcamActive].push([ stream.getVideoTracks()[0].getSettings().width, stream.getVideoTracks()[0].getSettings().height ]);
 				}
-		}
-		camResChecking=false;
-	});
+				return stream;
+		}).catch( (err)=>{ // Overload Error most likely - Failed to set camera to desired resolution
+		}).then((stream)=>{
+			camResIttr+=1;
+			if(camResCheckList.length==0){
+					stopStreams(stream);
+					camSafeResFound=true;
+					delayLoadCam=true;
+					promptFader(cameraLoading, false);
+					if(verbose){
+						let verb='Found Resolutions - '
+						for(var x=0; x<camSafeResValid[webcamActive].length;++x){
+							verb+=(x%4==0?"<br>":'')+" ["+camSafeResValid[webcamActive][x][0]+","+camSafeResValid[webcamActive][x][1]+"] ";
+						}
+						verb+="<br> Attempting Resolution : "+ camSafeRes[webcamActive][0] + " x " + camSafeRes[webcamActive][1];
+						verb+="<br> Booting Cam "+(webcamActive+1)+"/"+webcamList.length+" - "+webcamNameList[webcamActive];
+						verbConsole.innerHTML+=verb;
+					}
+			}
+			camResChecking=false;
+		});
+	}
 }
 
-function findMediaDevices(init){
+function findMediaDevices(){
     if (!navigator.getUserMedia){
         navigator.getUserMedia = navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
 	}
@@ -190,6 +206,7 @@ function findMediaDeviceData(mediaDevices){
 				camSafeRes.push(null);
 				camSafeResValid.push([]);
 				curResId.push(0);
+				camMalformFlip.push(null);
 			}
 		}
 	});
@@ -213,6 +230,40 @@ function findMediaDeviceData(mediaDevices){
 		setThumbnailPosition();
 		document.getElementById("icon-nextCamera").style.visibility="visible";
 	} 	
+}
+
+// Having problems with wide angle lense resolutions drawing with flipped resolutions
+// Not sure of a fix, manually checking pixel data for empty values to flip the resolution's width/height
+function detectMalformedResolution(){
+	if(camMalformFlip[webcamActive]==null){
+		var canvasSampler=document.createElement("canvas");
+		canvasSampler.width=pxlCanvas.width;
+		canvasSampler.height=pxlCanvas.height;
+
+		var curCtx=canvasSampler.getContext('2d');
+		curCtx.drawImage(pxlCanvas,0,0);
+		
+		var fader=curCtx.getImageData(canvasSampler.width-10,10,2,2);
+		var pix = fader.data;
+		var urSample=pix[0]+pix[1]+pix[2];
+		
+		fader=curCtx.getImageData(10,canvasSampler.height-10,2,2);
+		pix = fader.data;
+		var llSample=pix[0]+pix[1]+pix[2];
+		
+		fader=curCtx.getImageData(10,10,2,2);
+		pix = fader.data;
+		var ulSample=pix[0]+pix[1]+pix[2];
+		if(verbose) verbConsole.innerHTML+="<br> upleft "+ulSample+" | lowleft "+llSample+" | upright "+urSample;
+		
+		if(ulSample>0 && (llSample==0 || urSample==0)){
+			if(verbose) verbConsole.innerHTML+="<br> Malformed resolution detected.";
+			camMalformFlip[webcamActive]=true;
+			findPictureAspect();
+		}else{
+			if(verbose) verbConsole.innerHTML+="<br> Resolution rendering correctly.";
+		}
+	}
 }
 
 //////////////////////////////////////
@@ -253,3 +304,6 @@ function setDeviceFlash(active=false, savePhoto=false){
 		}
 	}
 }
+
+
+
