@@ -98,6 +98,7 @@ BODY{
 }
 .menuExitButton{
 	width:100%;
+	height:100%;
 	font-size:150%;
 	text-align:center;
 	padding:10px;
@@ -112,6 +113,7 @@ BODY{
 	top:0px;
 	left:50%;
 	transform:translateX(-50%);
+	width:100%;
 	height:100%;
 	overflow:hidden;
 	color:#fff;
@@ -175,6 +177,7 @@ BODY{
 	z-index:50;
 }
 .iconParent{
+	cursor:pointer;
 	position:fixed;
 	transform:translateX(-50%);
 	width:100px;
@@ -192,8 +195,11 @@ BODY{
 	visibility:hidden;
 }
 .iconTakePhoto{
-	bottom:0%;
+	position:fixed;
+	transform:translateX(-50%);
+	bottom:10%;
 	left:50%;
+	margin:0px;
 	border-width:5px;
 }
 .iconTakePhotoInnerBorder{
@@ -238,11 +244,11 @@ BODY{
 	border-radius:50%;
 }
 .iconMode{
-	bottom:1%;
+	bottom:7%;
 	left:12%;
 }
 .iconNextCamera{
-	bottom:1%;
+	bottom:7%;
 	right:12%;
 	transform:translateX(50%);
 }
@@ -278,7 +284,7 @@ BODY{
 .thumbnailBlock{
 	position:fixed;
 	transform:translate(50%,0%);
-	bottom:1%;
+	bottom:7%;
 	right:12%;
 	margin:10px;
 	text-align:center;
@@ -286,7 +292,7 @@ BODY{
 	filter: drop-shadow(0px 0px 3px #000);
 	display:inline;
 	visibility:visible;
-	z-index:51;
+	z-index:0;
 }
 .thumbnailText{
 	background-color:rgba(170,170,170,.3);
@@ -294,7 +300,7 @@ BODY{
 	border-width:2px;
 	border-color:#aaa;
 	border-radius:10px;
-	margin:5px;
+	margin-bottom:5px;
 }
 .thumbnailImage{
 	overflow:hidden;

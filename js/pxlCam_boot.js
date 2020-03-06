@@ -10,8 +10,7 @@ function init(){
 
 	window.addEventListener('onbeforeunload', stopStreams);
 	window.onresize=function(e){resizeRenderResolution();};
-	window.addEventListener('deviceorientation', devicePoseData);
-	//window.addEventListener('orientationchange', devicePoseChange); // Don't know when this ever fires, docs seem like it should run tho
+	buildDeviceMonitors();
 	
 	menuBlock=document.getElementById('menuBlock');
 	photoBinMenu=document.getElementById('photoBinMenu');
@@ -43,6 +42,7 @@ function init(){
 }
 
 //////////////////////////////////////
+
 
 function buildCameraLoadingPrompt(){
 	let textDiv=document.getElementById("cameraLoadingText");
@@ -120,11 +120,16 @@ function prepVerbose(){
 		<div id="verbose_camPausedState">
 			Orientation : Yaw - <span id="verbose_yaw">-</span> ; Pitch - <span id="verbose_pitch">-</span> ; Roll - <span id="verbose_roll">-</span> ;
 		</div>
-		<!-- <div id="verbose_camOrientationAngle">
+		<div id="verbose_camOrientationAngle">
 			Device Angle : <span id="verbose_curAngle">--</span>
-		</div> -->
+		</div>
+		<div id="verbose_gyroscope">
+			Gyroscope : X - <span id="verbose_gyrox">-</span> ; Y - <span id="verbose_gyroy">-</span> ; Z - <span id="verbose_gyroz">-</span> ;
+		</div>
 		<div id="verbose_prevCamData">
-			Previous Camera :</span> <span id="verbose_prevCam"></span>
+			Previous Camera : <span id="verbose_prevCam"></span>
+		</div>
+		<div id="verbose_errorConsole">
 		</div>
 		<br>
 		<div id="verbose_spacer"> --- --- Console --- ---</div>
@@ -143,6 +148,7 @@ function prepVerbose(){
 	verbPrevCamName=document.getElementById('verbose_prevCam');
 	verbMaxCam=document.getElementById('verbose_maxCamNumber');
 	verbPaused=document.getElementById('verbose_paused');
+	verbErrorConsole=document.getElementById('verbose_errorConsole');
 	verbConsole=document.getElementById('verbose_console');
 	
 	verbCamRes=document.getElementById('verbose_curCamRes');
@@ -150,16 +156,19 @@ function prepVerbose(){
 	verbPitch=document.getElementById('verbose_pitch');
 	verbRoll=document.getElementById('verbose_roll');
 	verbCurAngle=document.getElementById('verbose_curAngle');
+	verbGravityX=document.getElementById('verbose_gyrox');
+	verbGravityY=document.getElementById('verbose_gyroy');
+	verbGravityZ=document.getElementById('verbose_gyroz');
 	
 	verbBlock.style.display='inline';
 
 	verbDeviceRes.innerHTML=sW+"x"+sH;
 	
 	window.onerror=(msg,source,line,col,err)=>{
-		verbConsole.innerHTML=msg;
-		verbConsole.innerHTML+="<br>"+source;
-		verbConsole.innerHTML+="<br>Line - "+line+" | Col - "+col;
-		verbConsole.innerHTML+="<br>"+err;
+		verbErrorConsole.innerHTML=msg;
+		verbErrorConsole.innerHTML+="<br>"+source;
+		verbErrorConsole.innerHTML+="<br>Line - "+line+" | Col - "+col;
+		verbErrorConsole.innerHTML+="<br>"+err;
 	};
 }
 
@@ -169,9 +178,9 @@ function verbFunction(){
  //findPictureAspect(verbScriptToggle);
  //let res=(verbScriptToggle?[sW,sH]:[sH,sH]);
 //setCanvasRes(res);
-
-	smartBlurShader.uniforms.uResAspectX.value=1;
-	smartBlurShader.uniforms.uResAspectY.value=1;
+bootCamera();
+	//camCorrectionShader.uniforms.uResAspectX.value=1;
+	//camCorrectionShader.uniforms.uResAspectY.value=1;
 }
 //////////////////////////////////////
 
@@ -237,12 +246,12 @@ function setCanvasRes(res,setCanvas=true,save=false){
 	buildShaderPass(true, (save?((res[0]+res[1])/(sW+sH)):1) );
 	
 	if(camMalformFlip[webcamActive]==true){
-		smartBlurShader.uniforms.uMalformX.value=res[0]/res[1];
+		camCorrectionShader.uniforms.uMalformX.value=res[0]/res[1];
 	}else{
-		smartBlurShader.uniforms.uMalformX.value=1;
+		camCorrectionShader.uniforms.uMalformX.value=1;
 	}
-	smartBlurShader.uniforms.uResScaleX.value=1/res[1];
-	smartBlurShader.uniforms.uResScaleY.value=1/res[0];
+	camCorrectionShader.uniforms.uResScaleX.value=1/res[1];
+	camCorrectionShader.uniforms.uResScaleY.value=1/res[0];
 	filterShader.uniforms.uResScaleX.value=1/res[0];
 	filterShader.uniforms.uResScaleY.value=1/res[1];
 	
@@ -278,7 +287,7 @@ function mapBootEngine(){
 	
 	var aspectRatio=pxlCanvas.width/pxlCanvas.height;
 	pxlCamCamera=new THREE.PerspectiveCamera(35,aspectRatio, 1, 3000);
-	pxlCamCamera.position.z=130;
+	pxlCamCamera.position.z=sH*2;
 	pxlCamCamera.target=new THREE.Vector3(0,0,0);
 	pxlCamScene=new THREE.Scene();
 	//pxlProcessScene=new THREE.Scene();
@@ -295,9 +304,9 @@ function mapBootEngine(){
 	
 	if(verbose){
 		webcamVideo.onloadedmetadata=()=>{
+			webcamVideo.play();
 			if(camSafeResFound){
 				verbConsole.innerHTML+="<br> "+webcamVideo.width+ "x"+webcamVideo.height+" || "+ webcamVideo.videoWidth + "x"+ webcamVideo.videoHeight+" ||  "+webcamNameList[webcamActive];
-				webcamVideo.play();
 			}
 			if(camSafeResFound && camSafeResBooting && !camSafeResBooted){
 				camSafeResBooted=true;
@@ -306,7 +315,7 @@ function mapBootEngine(){
 		}
 	}else{
 		webcamVideo.onloadedmetadata=()=>{
-			webcamVideo.play();
+			//webcamVideo.play();
 		}
 	}
 	
@@ -314,14 +323,14 @@ function mapBootEngine(){
 	vidTexture.minFilter=THREE.LinearFilter;
 	vidTexture.magFilter=THREE.LinearFilter;
 	vidTexture.format=THREE.RGBFormat;
-	
-	vidGeo=new THREE.PlaneBufferGeometry(16, 9);
-	vidGeo.scale(.5,.5,.5);
+	/*
+	vidGeo=new THREE.PlaneBufferGeometry(sW, sH, sW,sH);
+	//vidGeo.scale(.5,.5,.5);
 	vidMat=new THREE.MeshBasicMaterial({map:vidTexture});
 	vidMesh=new THREE.Mesh(vidGeo, vidMat);
 	vidMesh.lookAt(pxlCamCamera.position);
 	pxlCamScene.add(vidMesh);
-	
+	*/
 	findMediaDevices();
 	
 	///////////////////////////////////////////////////////

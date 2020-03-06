@@ -1,7 +1,6 @@
 
 function stepShaderValues(){
 	if(effectMode<2){
-		
 		deltaX=pxlMouse.endPos[0]-pxlMouse.startPos[0];
 		deltaY=pxlMouse.startPos[1]-pxlMouse.endPos[1];
 		//smoothReachDist=runSmartBlur ? Math.max(2, Math.min(smoothReachDistMax, smoothReachDist+deltaX*.002)) : smoothReachDist;
@@ -33,43 +32,57 @@ function nextEffect(){
 	effectMode=(effectMode+1)%3;
 	if(effectMode<2){
 		darkenImageDist=1;
-		smoothReachDist=5;
+		smoothReachDist=pxlQuality.shaderSmartBlurReach;
 		edgeReachDist=10;
 	}else{
-		smoothReachDist=5;
+		smoothReachDist=pxlQuality.shaderSmartBlurReach;
 		hueSatch_flattenMultColor=0;
 		hueSatch_rotateHue=0;
 	}
 	buildShaderPass(true);
 	findPictureAspect();
 }
-function findPictureAspect(save=false){
+function findPictureAspect(save=false){ // ## Computer aspect ratio looks wrong, means mobile is too.  CHECK THIS SHAZZBUTT!
 	var aspectMult=[1,1];
+	camPictureAspect=[1,1];
+	var malformAdjust=1;
 	let res=[sW,sH];
-	if(!save){
-		let safe=[...camSafeRes[webcamActive]];
-		safe=mobile&&sH>sW?[safe[1],safe[0]]:safe;
-		let resAspect=[sW/sH, sH/sW];
+	if(camSafeRes[webcamActive]!=null && !save){
+		let safe=[...camSafeRes[webcamActive]]; // Most likely culpret, camSafeRes[webcamActive] may not be up to date
+		safe=mobile&&sH>sW?[safe[1],safe[0]]:safe; // Second most likely culpret; ie, video res displays 1920x1080, but draws as 1080x1920
+		let resAspect=sW/sH;
 		let safeAspect=[safe[0]/safe[1], safe[1]/safe[0]];
 		
-		aspectMult[0]=(resAspect[0]>safeAspect[0]) ? 1 : res[0]/(res[1]*safeAspect[0]) ;
-		aspectMult[1]=(resAspect[0]>safeAspect[0]) ? res[1]/(res[0]*safeAspect[1]) : 1 ;
+		aspectMult[0]=(resAspect>safeAspect) ? 1 : res[0]/(res[1]*safeAspect[0]) ;
+		aspectMult[1]=(resAspect>safeAspect) ? res[1]/(res[0]*safeAspect[1]) : 1 ;
+		if(aspectMult[0]>1){
+			aspectMult[1]*=1/aspectMult[0];
+			aspectMult[0]=1;
+		}else if(aspectMult[1]>1){
+			aspectMult[0]*=1/aspectMult[1];
+			aspectMult[1]=1;
+		}
+		
+		// Should never be the case, but if the webcamVideo or pxlCamCore DOM object's resolution fails to set, catch the NaN value
+		// Most likely I'm buggering around with reorganizing my code, and don't want to go on a goose chase finding why things are drawing wrong
+		if(isNaN(aspectMult[0]) || isNaN(aspectMult[1])){
+			aspectMult=[1,1];
+		}
+		camPictureAspect=[...aspectMult];
+		
+		// ## Freaking wide lens camera messing with me.
+		// This is a patch for wide cam drawing half width... ugh...
+		//if(camMalformFlip[webcamActive]==true){
+		//	malformAdjust=res[0]/res[1];
+		//}
 	}
-	aspectMult[0]=isNaN(aspectMult[0])?1:aspectMult[0];
-	aspectMult[1]=isNaN(aspectMult[1])?1:aspectMult[1];
-	camPictureAspect=[...aspectMult];
-	
-	if(camMalformFlip[webcamActive]==true){
-		smartBlurShader.uniforms.uMalformX.value=res[0]/res[1];
-	}else{
-		smartBlurShader.uniforms.uMalformX.value=1;
-	}
-	smartBlurShader.uniforms.uResAspectX.value=camPictureAspect[0];
-	smartBlurShader.uniforms.uResAspectY.value=camPictureAspect[1];
+	camCorrectionShader.uniforms.uMalformX.value=malformAdjust;
+	camCorrectionShader.uniforms.uResAspectX.value=camPictureAspect[0];
+	camCorrectionShader.uniforms.uResAspectY.value=camPictureAspect[1];
 }
 function takeShot(){
 	if(useFlash){
-		setDeviceFlash(true,true);
+		setDeviceFlash(true);
 	}else{
 		saveShot();
 	}
@@ -77,114 +90,138 @@ function takeShot(){
 function saveShot(){
 	let r=camSafeResValid[webcamActive][0];//camSafeRes[webcamActive];
 	r=mobile && sH>sW?[r[1],r[0]]:r;
-	var cameraRender,cameraCanvas;
+	var cameraRender,cameraCanvas,curRotCanvas;
 	setCanvasRes(r,true,true); // Renders the scene too	
-		
-	if(phonePoseActive && (Math.abs(phone_ypr[0])<.45 && sH>sW)){
-		var curRotCanvas=document.createElement("canvas");
-		curRotCanvas.height=camSafeRes[webcamActive][1];
-		curRotCanvas.width=camSafeRes[webcamActive][0];
+	setDeviceFlash(false);
+	//setTimeout(()=>{
+		if(verbose) verbConsole.innerHTML="";
+			
+		//if(phonePoseActive && (Math.abs(phone_ypr[0])<.45 && sH>sW)){
+		if( Math.abs(accGravity[0])>Math.abs(accGravity[1]) && sH>sW){
+			curRotCanvas=document.createElement("canvas");
+			curRotCanvas.width=r[1];//camSafeRes[webcamActive][0];
+			curRotCanvas.height=r[0];//camSafeRes[webcamActive][1];
+			r=[r[1],r[0]];
 
-		var curCtx=curRotCanvas.getContext('2d');
-		curCtx.clearRect(0,0,curRotCanvas.width,curRotCanvas.height);
-		curCtx.save();
-		curCtx.translate(curRotCanvas.width*.5, curRotCanvas.height*.5);
-		if(flipHorizontal){
-			curCtx.rotate(Math.PI*.5 * (flipHorizontal ? -1:1) ); // ##
+			var curCtx=curRotCanvas.getContext('2d');
+			curCtx.clearRect(0,0,curRotCanvas.width,curRotCanvas.height);
+			curCtx.save();
+			curCtx.translate(curRotCanvas.width*.5, curRotCanvas.height*.5);
+			curCtx.rotate(Math.PI*.5 * -1 * (accGravity[0]<0 ? -1:1) );
+			curCtx.translate(-curRotCanvas.height*.5, -curRotCanvas.width*.5);
+			curCtx.drawImage(pxlCanvas,0,0);
+			curCtx.restore();
+			cameraCanvas=curRotCanvas;
+			if (verbose) verbConsole.innerHTML+="<br> Flip Rot - "+curRotCanvas.width+" x "+curRotCanvas.height;
+		}else if(Math.abs(accGravity[0])<Math.abs(accGravity[1]) && accGravity[1]<0 && sH>sW){
+			curRotCanvas=document.createElement("canvas");
+			curRotCanvas.width=r[0];//camSafeRes[webcamActive][0];
+			curRotCanvas.height=r[1];//camSafeRes[webcamActive][1];
+			r=[r[1],r[0]];
+
+			var curCtx=curRotCanvas.getContext('2d');
+			curCtx.clearRect(0,0,curRotCanvas.width,curRotCanvas.height);
+			curCtx.save();
+			curCtx.translate(curRotCanvas.width*.5, curRotCanvas.height*.5);
+			curCtx.rotate(Math.PI);
+			curCtx.translate(-curRotCanvas.width*.5, -curRotCanvas.height*.5);
+			curCtx.drawImage(pxlCanvas,0,0);
+			curCtx.restore();
+			cameraCanvas=curRotCanvas;
+			if (verbose) verbConsole.innerHTML+="<br> Flopped - "+curRotCanvas.width+" x "+curRotCanvas.height;
 		}else{
-			curCtx.rotate(Math.PI*.5 * (flipHorizontal ? 1:-1) ); // ##
+			cameraCanvas=pxlCanvas;
 		}
-		curCtx.translate(-curRotCanvas.height*.5, -curRotCanvas.width*.5);
-		curCtx.drawImage(pxlCanvas,0,0);
-		curCtx.restore();
-		cameraCanvas=curRotCanvas;
-	}else{
-		cameraCanvas=pxlCanvas;
-	}
-	cameraRender=pxlCanvas.toDataURL("image/png");
-		
-	////////////////////////////////////////////////////
-	// Convert png data to blob for direct download
-	var blob=atob(cameraRender.split(',')[1]);
-	var fileSize=blob.length;
-	var arr=new Uint8Array(fileSize);
-	for(var x=0; x<fileSize; ++x){
-		arr[x]=blob.charCodeAt(x);
-	}
-	var cameraData=URL.createObjectURL(new Blob([arr]));
-	
-  
-	////////////////////////////////////////////////////
-	// File listing info
-	var dt=new Date();
-	var timeSuffix="_"+(dt.getMonth()+1)+"-"+dt.getDate()+"-"+dt.getFullYear()+"_"+dt.getHours()+"-"+dt.getMinutes()+"-"+dt.getSeconds();
-	let fileName="pxlCam"+timeSuffix+".png";
-	
-	addPhotoBinEntry("photoBinScroller", r, cameraRender, cameraData, fileName, fileSize);
-	
-	//let fileSizeKB=fileSize*0.0009765625;
-	//let fileSizeMB=fileSizeKB*0.0009765625;
-	let fileSizeKB=toHundreths(fileSize*0.001);
-	let fileSizeMB=toHundreths(fileSizeKB*0.001);
-	let thumbnailPrompt=fileSizeMB>1?fileSizeMB+" MB":fileSizeKB+" KB";
-	thumbnailPrompt+="<br>Edit Below";
-	if(verbose) verbConsole.innerHTML="KB - "+fileSizeKB+" | MB - "+fileSizeMB;
-	
-	let ratio;
-	let scalar=[0,0,cameraCanvas.width, cameraCanvas.height];
-	let tmp=[...scalar];
-	let pushIn=.75;
-	if(scalar[3]<scalar[2]){
-		scalar[0]=tmp[2]*.5-(tmp[3]*pushIn*camPictureAspect[0])*.5;
-		scalar[1]=tmp[3]*camPictureAspect[1]*(1-pushIn);
-		scalar[2]=tmp[3]*pushIn*camPictureAspect[1];
-		scalar[3]=tmp[3]*camPictureAspect[1]*(pushIn);
-	}else{
-		scalar[0]=tmp[2]*camPictureAspect[0]*(1-pushIn);
-		scalar[1]=tmp[3]*.5-(tmp[2]*pushIn*camPictureAspect[0])*.5;
-		scalar[2]=tmp[2]*camPictureAspect[0]*(pushIn);
-		scalar[3]=tmp[2]*pushIn*camPictureAspect[1];
-	}
-	
-	let tCtx=thumbnailCanvas.getContext("2d");
-	tCtx.drawImage(cameraCanvas, ...scalar, 0,0,thumbnailCanvas.width,thumbnailCanvas.height);
-	//thumbnailCanvas.src=cameraRender;
-	
-	thumbnailText.innerHTML=thumbnailPrompt;
-	promptFader(thumbnailText,true,3);
-	promptFader(thumbnailImage,true);
-	
-	////////////////////////////////////////////////////
-	// Auto download image
-	var tempLink=document.createElement("a");
-	tempLink.download=fileName;
-	tempLink.href=cameraData;
-	document.body.appendChild(tempLink);
-	tempLink.click();
-	document.body.removeChild(tempLink);
-	if(flipHorizontal){
-		filterShader.uniforms.uFlipHorizontal.value=true;
-	}
-	setCanvasRes([sW,sH]); // Renders the scene too
-	
-	setDeviceFlash(false, false);
-	
+		cameraRender=cameraCanvas.toDataURL("image/png");
+		//setCanvasRes([sW,sH]); // Renders the scene too
+		//setTimeout(()=>{
+				
+			////////////////////////////////////////////////////
+			// Convert png data to blob for direct download
+			var blob=atob(cameraRender.split(',')[1]);
+			var fileSize=blob.length;
+			var arr=new Uint8Array(fileSize);
+			for(var x=0; x<fileSize; ++x){
+				arr[x]=blob.charCodeAt(x);
+			}
+			var cameraData=URL.createObjectURL(new Blob([arr]));
+			
+		  
+			////////////////////////////////////////////////////
+			// File listing info
+			var dt=new Date();
+			var timeSuffix="_"+(dt.getMonth()+1)+"-"+dt.getDate()+"-"+dt.getFullYear()+"_"+dt.getHours()+"-"+dt.getMinutes()+"-"+dt.getSeconds();
+			let fileName="pxlCam"+timeSuffix+".png";
+			
+			addPhotoBinEntry("photoBinScroller", r, cameraRender, cameraData, fileName, fileSize);
+			
+			//let fileSizeKB=fileSize*0.0009765625;
+			//let fileSizeMB=fileSizeKB*0.0009765625;
+			let fileSizeKB=toHundreths(fileSize*0.001);
+			let fileSizeMB=toHundreths(fileSizeKB*0.001);
+			let thumbnailPrompt=fileSizeMB>1?fileSizeMB+" MB":fileSizeKB+" KB";
+			thumbnailPrompt+="<br>Edit Below";
+			if(verbose) verbConsole.innerHTML+="<br>KB - "+fileSizeKB+" | MB - "+fileSizeMB;
+			
+			let ratio;
+			let scalar=[0,0,cameraCanvas.width, cameraCanvas.height];
+			let tmp=[...scalar];
+			let pushIn=.75;
+			if(scalar[3]<scalar[2]){
+				scalar[0]=tmp[2]*.5-(tmp[3]*pushIn*camPictureAspect[0])*.5;
+				scalar[1]=tmp[3]*camPictureAspect[1]*(1-pushIn);
+				scalar[2]=tmp[3]*pushIn*camPictureAspect[1];
+				scalar[3]=tmp[3]*camPictureAspect[1]*(pushIn);
+			}else{
+				scalar[0]=tmp[2]*camPictureAspect[0]*(1-pushIn);
+				scalar[1]=tmp[3]*.5-(tmp[2]*pushIn*camPictureAspect[0])*.5;
+				scalar[2]=tmp[2]*camPictureAspect[0]*(pushIn);
+				scalar[3]=tmp[2]*pushIn*camPictureAspect[1];
+			}
+			
+			let tCtx=thumbnailCanvas.getContext("2d");
+			tCtx.drawImage(cameraCanvas, ...scalar, 0,0,thumbnailCanvas.width,thumbnailCanvas.height);
+			//thumbnailCanvas.src=cameraRender;
+			
+			////////////////////////////////////////////////////
+			// Auto download image
+			var tempLink=document.createElement("a");
+			tempLink.download=fileName;
+			tempLink.href=cameraData;
+			document.body.appendChild(tempLink);
+			tempLink.click();
+			document.body.removeChild(tempLink);
+			if(flipHorizontal){
+				camCorrectionShader.uniforms.uFlipHorizontal.value=true;
+			}
+			setCanvasRes([sW,sH]); // Renders the scene too
+			
+			thumbnailText.innerHTML=thumbnailPrompt;
+			promptFader(thumbnailText,true,4);
+			promptFader(thumbnailImage,true);
+			let tBlock=document.getElementById('thumbnailBlock');
+			tBlock.style.zIndex=51;
+			pxlPause=false;
+			pxlRender();
+		//},100);
+	//},200);
 }
 
 function filter_smartBlur(mult=1){
-	smartBlurShader=new THREE.ShaderMaterial({
+	camCorrectionShader=new THREE.ShaderMaterial({
 		uniforms:{
 			"tDiffuse":{type:"t",value:0,texture:null},
 			"uResScaleX":{type:"f",value:1/sW},
 			"uResScaleY":{type:"f",value:1/sH},
 			"uMalformX":{type:"f",value:1},
+			"uFlipHorizontal":{type:"b",value:flipHorizontal},
 			"uResAspectX":{type:"f",value:camPictureAspect[0]},
 			"uResAspectY":{type:"f",value:camPictureAspect[1]},
 		},
 		vertexShader:webcamVertex(),
 		fragmentShader:webcamFragment_smartBlur(parseInt(smoothReachDist*mult))
 	});
-	smartBlurShader.uniforms.tDiffuse.value=vidTexture;
+	camCorrectionShader.uniforms.tDiffuse.value=vidTexture;
 }
 
 function filter_shiftEdgeThickness(force=false, mult=1){
@@ -196,10 +233,7 @@ function filter_shiftEdgeThickness(force=false, mult=1){
 				"tDiffuse":{type:"t",value:0,texture:null},
 				"uResScaleX":{type:"f",value:1/sW},
 				"uResScaleY":{type:"f",value:1/sH},
-				"uResAspectX":{type:"f",value:camPictureAspect[0]},
-				"uResAspectY":{type:"f",value:camPictureAspect[1]},
 				"uCompensateScale":{type:"b",value:compensateScale},
-				"uFlipHorizontal":{type:"b",value:flipHorizontal},
 				"uEdgeMode":{type:"i",value:effectMode},
 				"uEdgeReach":{type:"i",value:parseInt(edgeReachDist)},
 				"uDarkenImage":{type:"f",value:darkenImageDist}
@@ -222,10 +256,7 @@ function filter_shiftHueSaturation(force=false){
 				"tDiffuse":{type:"t",value:0,texture:null},
 				"uResScaleX":{type:"f",value:1/sW},
 				"uResScaleY":{type:"f",value:1/sH},
-				"uResAspectX":{type:"f",value:camPictureAspect[0]},
-				"uResAspectY":{type:"f",value:camPictureAspect[1]},
 				"uCompensateScale":{type:"b",value:compensateScale},
-				"uFlipHorizontal":{type:"b",value:flipHorizontal},
 				"uFlattenScalar":{type:"f",value:hueSatch_flattenMultColor},
 				"uRotateHue":{type:"f",value:hueSatch_rotateHue}
 			},
@@ -242,11 +273,11 @@ function buildComposer(){
 	pxlCamComposer = new THREE.EffectComposer(pxlCamEngine, pxlCamRenderTarget);
 	//pxlCamComposer = new THREE.RenderPass(pxlCamEngine, pxlCamRenderTarget);
 	
-	cameraRenderPass=new THREE.RenderPass(pxlCamScene,pxlCamCamera);
-	smartBlurShaderPass=new THREE.ShaderPass(smartBlurShader,pxlCamRenderTarget.texture);
-	smartBlurShaderPass.clear=false;
-	//smartBlurShaderPass.material.transparent=true;
-	pxlCamComposer.addPass(smartBlurShaderPass);
+	//cameraRenderPass=new THREE.RenderPass(pxlCamScene,pxlCamCamera);
+	camCorrectionShaderPass=new THREE.ShaderPass(camCorrectionShader,pxlCamRenderTarget.texture);
+	//camCorrectionShaderPass.clear=false;
+	//camCorrectionShaderPass.material.transparent=true;
+	pxlCamComposer.addPass(camCorrectionShaderPass);
 	//filterShaderPass.renderToScreen=true;
 	
 	pxlCamShaderComposer= new THREE.EffectComposer(pxlCamEngine);
@@ -254,6 +285,8 @@ function buildComposer(){
 	filterShaderPass.clear=false;
 	//filterShaderPass.material.transparent=true;
 	
+	//pxlCamShaderComposer.addPass(cameraRenderPass);
+	//cameraRenderPass.renderToScreen=true;
 	pxlCamShaderComposer.addPass(filterShaderPass);
 	filterShaderPass.renderToScreen=true;
 }
@@ -270,12 +303,27 @@ function webcamVertex(){
 }
 
 function webcamFragment_smartBlur(smoothReach){
-	var retFrag= `
-		precision mediump float;
+	var retFrag= ``;
+	if(pxlQuality.shaderPrecision==3){
+		retFrag+=`
+			#ifdef GL_FRAGMENT_PRECISION_HIGH
+				precision highp float;
+			#else
+				precision mediump float;
+			#endif`;
+	}else if(pxlQuality.shaderPrecision==2){
+		retFrag+=`
+			precision mediump float;`;
+	}else{
+		retFrag+=`
+			precision lowp float;`;
+	}
+	retFrag+=`
 		uniform sampler2D	tDiffuse;
 		uniform float		uMalformX;
 		uniform float		uResAspectX;
 		uniform float		uResAspectY;
+		uniform bool		uFlipHorizontal;
 		uniform float		uResScaleX;
 		uniform float		uResScaleY;
 
@@ -336,11 +384,12 @@ function webcamFragment_smartBlur(smoothReach){
 		}
 		void main( void ){
 			vec2 uv = vUv;
+			uv.x=uFlipHorizontal ? 1.0-uv.x : uv.x;
 			uv=(uv-.5)*vec2(uResAspectX,uResAspectY)+.5;
 			uv.x*=uMalformX;
 			
 			vec4 Cd=texture2D(tDiffuse,uv);
-			vec4 smartBlurCd=vec4( smartBlurRGB(tDiffuse, uv, vec2(uResScaleX,uResScaleY), .1), 1.0);
+			vec4 smartBlurCd=vec4( smartBlurRGB(tDiffuse, uv, vec2(uResScaleX,uResScaleY), .15), 1.0);
 			Cd=smartBlurCd;
 			
 			gl_FragColor=Cd;
@@ -350,16 +399,26 @@ function webcamFragment_smartBlur(smoothReach){
 }
 
 function webcamFragment_colorEdge(edgeReach){
-	
-	var retFrag= `
-		precision mediump float;
+	var retFrag= ``;
+	if(pxlQuality.shaderPrecision==3){
+		retFrag+=`
+			#ifdef GL_FRAGMENT_PRECISION_HIGH
+				precision highp float;
+			#else
+				precision mediump float;
+			#endif`;
+	}else if(pxlQuality.shaderPrecision==2){
+		retFrag+=`
+			precision mediump float;`;
+	}else{
+		retFrag+=`
+			precision lowp float;`;
+	}
+	retFrag+=`
 		uniform sampler2D	tDiffuse;
-		uniform float		uResAspectX;
-		uniform float		uResAspectY;
 		uniform float		uResScaleX;
 		uniform float		uResScaleY;
 		uniform bool		uCompensateScale;
-		uniform bool		uFlipHorizontal;
 		uniform float		uDarkenImage;
 		
 		uniform int			uEdgeMode;
@@ -416,10 +475,8 @@ function webcamFragment_colorEdge(edgeReach){
 		}
 		void main( void ){
 			vec2 uv = vUv;
-			uv.x=uFlipHorizontal ? 1.0-uv.x : uv.x;
 			
 			vec4 Cd=texture2D(tDiffuse,uv);
-			vec4 curCd=texture2D(tDiffuse,uv);
 			
 			float edges= findEdgesRGB(tDiffuse, uv, vec2(uResScaleX,uResScaleY),.1);
 			edges= min(1.0, edges*10.0);
@@ -445,15 +502,24 @@ function webcamFragment_hueSatch(){
 	// RGB conversion from -
 	// http://lolengine.net/blog/2013/07/27/rgb-to-hsv-in-glsl
 	
-	var retFrag= `
-		precision mediump float;
+	var retFrag= ``;
+	if(pxlQuality.shaderPrecision==3){
+		retFrag+=`
+			#ifdef GL_FRAGMENT_PRECISION_HIGH
+				precision highp float;
+			#else
+				precision mediump float;
+			#endif`;
+	}else if(pxlQuality.shaderPrecision==2){
+		retFrag+=`
+			precision mediump float;`;
+	}else{
+		retFrag+=`
+			precision lowp float;`;
+	}
+	retFrag+=`
 		uniform sampler2D	tDiffuse;
-		uniform float		uResAspectX;
-		uniform float		uResAspectY;
-		uniform float		uResScaleX;
-		uniform float		uResScaleY;
 		uniform bool		uCompensateScale;
-		uniform bool		uFlipHorizontal;
 
 		uniform float		uFlattenScalar;
 		uniform float		uRotateHue;
@@ -482,7 +548,6 @@ function webcamFragment_hueSatch(){
 		}
 		void main( void ){
 			vec2 uv = vUv;
-			uv.x=uFlipHorizontal ? 1.0-uv.x : uv.x;
 			
 			vec4 Cd=texture2D(tDiffuse,uv);
 			vec4 curCd=texture2D(tDiffuse,uv);

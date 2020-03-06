@@ -14,6 +14,7 @@ class MouseController{
 		this.wheelDelta=0;
 		
 		const firefox=/Firefox/i.test(navigator.userAgent);
+		//const IE = document.all?true:false;
 		this.mouseWheelEvt=(firefox)? "DOMMouseScroll" : "mousewheel" ;
 		this.button=0;
 		this.inputActive=false;
@@ -73,7 +74,7 @@ class MouseController{
 			curY=e.clientY;
 		}else{
 			if(e.touches){
-				touch = e.touches[0];
+				let touch = e.touches[0];
 				curX = touch.pageX;
 				curY = touch.pageY;
 			}
@@ -128,33 +129,11 @@ class MouseController{
 			eval(this.mouseUpEval);
 		}
 	}
-	mouseWheel(e){ // Scroll wheel -- set up for a ThreeJS rayCastObject, which isn't be used right now
+	mouseWheel(e){ // Scroll wheel
 		//Ehhhh IE be damned...
 		if(this.inputActive){
 			let delta=Math.sign(e.detail || e.wheelDelta);
 			this.wheelDelta+=delta;
-			/*if(pxlCamCameraMode == 2){
-				this.wheelDelta=Math.max(-10, this.wheelDelta);
-				if(delta<0){
-					this.netDistance[0]*=.9;
-					this.netDistance[2]*=.9;
-				}else{
-					let blend=.5;
-					objRaycast.setFromCamera(pxlMouse,pxlCamCamera);
-					let rayHits=objRaycast.intersectObjects([geoList['table'][0]]);
-					let objRayCurPos=new THREE.Vector3(this.netDistance[0],this.netDistance[1],this.netDistance[2]);
-					if(rayHits.length > 0){
-						for(let x=0; x<rayHits.length;++x){
-							let obj=rayHits[x].object;
-							objRayCurPos=rayHits[x].point;
-							break;
-						}
-						objRayCurPos.sub(pxlCamCamera.position).multiplyScalar(3).multiplyScalar(-1*(Math.max(0,this.wheelDelta/3)));
-						this.netDistance[0]=this.netDistance[0]+ objRayCurPos.x;//*blend;
-						this.netDistance[2]=this.netDistance[2]+ objRayCurPos.z;//*blend;
-					}
-				}
-			}*/
 			eval(this.mouseWheelEval);
 		}
 	}

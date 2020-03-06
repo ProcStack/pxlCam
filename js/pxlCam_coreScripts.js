@@ -190,7 +190,7 @@ class PhotoBinEntry{
 		tempLink.click();
 		document.body.removeChild(tempLink);
 		if(flipHorizontal){
-			filterShader.uniforms.uFlipHorizontal.value=true;
+			camCorrectionShader.uniforms.uFlipHorizontal.value=true;
 		}
 	}
 	getFileName(){
@@ -248,7 +248,7 @@ function setThumbnailPosition(){
 	let nBottom=nCam.style.bottom+nCam.offsetHeight;
 	let tBlock=document.getElementById('thumbnailBlock');
 	tBlock.style.bottom=nBottom;
-	tBlock.style.transform="translate(50%,-20%)";
+	tBlock.style.transform="translate(50%,-50%)";
 }
 function nullToggle(obj){
 	let canvas=obj.getElementsByTagName('canvas');
@@ -509,23 +509,26 @@ function pxlRender(){
 		}else{
 			delayLoadCam=false;
 			findPictureAspect();
+			pxlCamEngine.dispose();
+			vidTexture.dispose();
 			bootCamera();
 		}
 	}
-	if(camCheckMalformedRes<camMalformedCheckMax && mobile){
+	/*if(camCheckMalformedRes<camMalformedCheckMax && mobile){
 		camCheckMalformedRes+=1;
 		if(camCheckMalformedRes==camMalformedCheckMax){
 			detectMalformedResolution();
 		}
-	}
+	}*/
 	
 	checkFadeOutList();
 	
 	if(delaySaveShot && useFlash && curTime>takeShotTime){
 		delaySaveShot=false;
+		pxlPause=true;
 		saveShot();
 	}else{
-		if(camSafeResFound){
+		if(camSafeResFound && !pxlPause){
 			pxlRenderStack();
 		}
 	}

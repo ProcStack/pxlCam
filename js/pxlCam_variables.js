@@ -1,84 +1,63 @@
+// Standard unprofessional global variables
 var pxlCamCore="pxlCam-core";
 var pxlCamEngine,pxlCamGL,pxlCamCamera,pxlCamScene,pxlCamComposer, pxlCamShaderComposer;
-var smartBlurShader, filterShader;
-var cameraRenderPass,smartBlurShaderPass,filterShaderPass;
+var camCorrectionShader, filterShader; // ## Rename smartBlur instances to picturePrep
+var cameraRenderPass,camCorrectionShaderPass,filterShaderPass;
 var pxlCamRenderTarget;
-var mapResPerc=1;//mobile?.25:.5;
+var mapResPerc=1;//mobile?.25:.5; // ## Automatic quality reduction, NOT IMPLEMENTED
 var mapAutoQuality=1;
-//var loadFullTome=mobile?0:1;
-var loadFullTome=0;
+var pxlQuality={
+	'renderTargetScale':10, // ## Not implemented
+	'shaderSmartBlurReach':5,
+	'shaderPrecision':3,
+};
 var cameraLoading,iconTray,alignLines,frontFlash,menuExit;
 var menuBlock,photoBinMenu;
 var photoBinObjects=[];
 var activeMenu=null;
 var previousMenu=[]; // For back buttons, nested menus;  Hierarchy - [ parent, ...chilren ]
-var catchNavigatorCalls=false;
-var takeShotTime=0;
-var flashWaitTime=1000;
+var catchNavigatorCalls=false; // ## Attemped to catch user changing page/navigating; NOT WORKING
+// Current MS value before taking a shot
+var takeShotTime=0;  // ## Add into default take photo functionality to reduce device shake from the finger tap
+var flashWaitTime=1000; // MS to keep flash on for camera focus / white balance
 var useFlash=false;
 var useFrontFlash=false;
 var flashActive=false;
-var delaySaveShot=false;
-var verbBlock,verbFPS,verbDeviceRes,verbCurCam,verbCurCamName,verbPrevCamName,verbMaxCam,verbPaused,verbConsole,verbYaw,verbPitch,verbRoll,verbCamRes,verbCurAngle;
+var delaySaveShot=false; // Wait till next next requestAnimationFrame before booting the camera, pxlRender()
+// ## Verbose dom objects. Could be cleaned up more; put into a class or something...
+var verbBlock,verbFPS,verbDeviceRes,verbCurCam,verbCurCamName,verbPrevCamName,verbMaxCam,verbPaused,verbConsole,verbErrorConsole,verbYaw,verbPitch,verbRoll,verbCamRes,verbCurAngle,verbGravityX,verbGravityY,verbGravityZ;
 var verbScriptToggle=true;
 
 var pxlProcessScene=null; // pxlProcessScene.add(processorObj[0]);
 var pxlCanvas,pxlW,pxlH;
 var sW=window.innerWidth;
 var sH=window.innerHeight;
-var pxlMouse=new THREE.Vector2();
 
 // ========================================
-const firefox=/Firefox/i.test(navigator.userAgent);
-const mouseWheelEvt=(firefox)? "DOMMouseScroll" : "mousewheel" ;
-var mouseWheelDelta=0;
-var mouseButton=0;
-const IE = document.all?true:false;
-var touch =0;
-var touchScreen=0;
+
 var clockTime=Date.now();
 var fpsGrabTime=Date.now()+1000;
 var fpsAvg=0;
 var fpsCount=0;
-var groupList=[];
-var geoList=[];
-var geoLoadList=[]; // 0 Not loaded, 1 Loaded, 2 Loaded and Processed (Setting Dependants)
-var geoLoadListComplete=0;
-var geoFunctionList=[];
-var lightList=[];
-var lightMapList=[];
 var pxlPause=false;
 var renderPause=false;
-var inputActive=true;
 var runner=-1;
-const pi=3.14159265358979;
+const pi=3.14159265358979; // Math.PI?  SCREW IT! hahaha
+var gyroscope=null;
+var accGravity=[0,9,0];
 
 // ========================================
 
-//Attribute modification callback
-// Used for checking videoWidth/videoHeight changes
-//  There's got to be a better way....
-// DOM Object Mutations support - { 'attributes', 'childList', 'subtree' }
-const attrMutationConfig={ attributes:true, childList:false, subtree:false };
-const attrMutationCallback=(mutationList,observer)=>{
-	for( mutation of mutationList ){
-		let type=mutation.type;
-		if(type==="attributes"){
-			console.log("Attr modded --");
-			let mutName=mutation.attributeName;
-			let mutVal=mutation.target.getAttribute(mutName);
-			console.log(mutName+" -- "+mutVal);
-		}
-	}
-};
-const attrObserver=new MutationObserver(attrMutationCallback);
-
 // Ugg, sooooooooooooooo
-// 'Exact' returns a higher value than most entries
-// {'min', 'max', 'ideal'} be damned for res checking
-// Store and run from the higher value
+// 'Exact' video constraint returns a higher value than most entries below
+// {'min', 'max', 'ideal'} be damned for res checking...
+// They just return the same safe resolution over and over within the range
+// Which defeats the purpose of finding a range of camera reslotions
+//
+// Store and run from the higher value to lower, dynamic shift to lower resolutions camSafeResValid[N+1]
 var camSafeRes=[]; // Keep the safe, dispose of the rest!
 var camSafeResValid=[];
+var camSafeResValidWidth=[];
 var camMalformFlip=[];
 var curResId=[];
 var camOddResList=[
@@ -144,7 +123,8 @@ var camMalformedCheckMax=40;
 
 // ========================================
 
-var fadeOutList=[];
+
+var fadeOutList=[]; // DOM Object fade in/out list
 var thumbnailText,thumbnailImage,thumbnailCanvas;
 
 // ========================================
@@ -158,7 +138,7 @@ var webcamList=[];
 var webcamNameList=[];
 
 var pxlCamBootError=false;
-var delayLoadCam=false; // Keep false; ticks on once camera boots initially camera on boot
+var delayLoadCam=false; // Keep false; ticks true once camera's safe resolution boots, .then(success)
 var failedBootCount=0;
 var totalFailedBootCount=0;
 var flipHorizontal=false;
@@ -187,3 +167,27 @@ var phonePoseActive=false;
 var phone_ypr=[0,0,0];
 var phone_yprDelta=[0,0,0];
 var phone_yprInit=[0,0,0];
+
+// ========================================
+// NOT CURRENTLY USED
+// Created in attempts to catch camera stream resolution changes
+// But reworked how the getUserMedia promises work
+// Leaving it here because its useful in function... but useless for pxlCam
+//
+//Attribute modification callback
+// Used for checking videoWidth/videoHeight changes
+//  There's got to be a better way....
+// DOM Object Mutations support - { 'attributes', 'childList', 'subtree' }
+const attrMutationConfig={ attributes:true, childList:false, subtree:false };
+const attrMutationCallback=(mutationList,observer)=>{
+	for( mutation of mutationList ){
+		let type=mutation.type;
+		if(type==="attributes"){
+			console.log("Attr modded --");
+			let mutName=mutation.attributeName;
+			let mutVal=mutation.target.getAttribute(mutName);
+			console.log(mutName+" -- "+mutVal);
+		}
+	}
+};
+const attrObserver=new MutationObserver(attrMutationCallback);
