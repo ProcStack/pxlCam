@@ -10,15 +10,15 @@ function stopStreams(stream){
 }
 
 function pausePlayback(){
-	pxlPause=!pxlPause;
-	pxlPause ? window.stream.getVideoTracks()[0].stop() : (renderPause=true,bootCamera());
+	pxlActive=!pxlActive;
+	pxlActive ? (renderPause=true,bootCamera()) : window.stream.getVideoTracks()[0].stop() ;
 	if(verbose) verbPaused.innerText=webcamVideo.paused?"PAUSED":"PLAYING";
 }
 
 
 function buildDeviceMonitors(){
 	
-	window.addEventListener('deviceorientation', devicePoseData);
+	//window.addEventListener('deviceorientation', devicePoseData);
 	//gyroscope=new Gyroscope({frequency:10});
 	//gyroscope.addEventListener('reading',gyroPoseData);
 	//gyroscope.start();
@@ -207,6 +207,7 @@ function findPictureFlip(){
 }
 
 function checkMediaRes(){
+	console.log("Finding res");
 	var r=camResCheckList.pop();
 	if(!isNaN(webcamActive)){
 		stopStreams();
@@ -245,6 +246,7 @@ function checkMediaRes(){
 				camSafeResFound=true;
 				delayLoadCam=true;
 				promptFader(cameraLoading, false);
+				pxlCookieManager.setCookie(["webcamNameList","camSafeRes","camSafeResValid","camSafeResValidWidth","curResId","camMalformFlip"]);
 				if(verbose){
 					let verb='Found '+camSafeResValid.length+' Resolutions -';
 					for(var x=0; x<camSafeResValid[webcamActive].length;++x){
@@ -264,6 +266,27 @@ function findMediaDevices(){
 	if( navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
 		navigator.mediaDevices.enumerateDevices().then( (mediaDevices) => {
 			findMediaDeviceData(mediaDevices);
+		}).then(()=>{
+			if(pxlCookieManager.hasCookie("webcamList")){
+				console.log("found cookie");
+				let tmp=[...webcamList];
+				let tmpString=pxlCookieManager.variableToString(tmp);
+				let cookieValue=pxlCookieManager.readCookie("webcamList").toString();
+				if(tmpString==cookieValue){
+					//console.log("Cookies read");
+					pxlCookieManager.evalCookies();
+					camResCheckList=[];
+					camSafeResFound=true;
+					delayLoadCam=true;
+				}else{
+					//console.log("Cookies cleared");
+					pxlCookieManager.clearCookie();
+				}
+			}else{
+				pxlCookieManager.setCookie("webcamList");
+			}
+			pxlActive=true;
+			pxlRender(runner);
 		});
 	}else{
 		console.log("Webcam not available");

@@ -4,6 +4,7 @@ var pxlCamEngine,pxlCamGL,pxlCamCamera,pxlCamScene,pxlCamComposer, pxlCamShaderC
 var camCorrectionShader, filterShader; // ## Rename smartBlur instances to picturePrep
 var cameraRenderPass,camCorrectionShaderPass,filterShaderPass;
 var pxlCamRenderTarget;
+var pxlActive=false;
 var mapResPerc=1;//mobile?.25:.5; // ## Automatic quality reduction, NOT IMPLEMENTED
 var mapAutoQuality=1;
 var pxlQuality={
@@ -39,7 +40,6 @@ var clockTime=Date.now();
 var fpsGrabTime=Date.now()+1000;
 var fpsAvg=0;
 var fpsCount=0;
-var pxlPause=false;
 var renderPause=false;
 var runner=-1;
 const pi=3.14159265358979; // Math.PI?  SCREW IT! hahaha

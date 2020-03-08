@@ -201,7 +201,7 @@ function saveShot(){
 			promptFader(thumbnailImage,true);
 			let tBlock=document.getElementById('thumbnailBlock');
 			tBlock.style.zIndex=51;
-			pxlPause=false;
+			pxlActive=true;
 			pxlRender();
 		//},100);
 	//},200);

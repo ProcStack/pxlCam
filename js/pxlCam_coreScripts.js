@@ -1,9 +1,10 @@
 
 function openMenu(divName){
 	pxlMouse.inputActive=false;
+	pxlActive=false;
 	let bootMenu=document.getElementById(divName);
 	if(activeMenu!=null){
-		closeActiveMenu(true);
+		closeActiveMenu(false);
 	}else{
 		promptFader(menuBlock, true);
 		menuBlock.style.zIndex=70;
@@ -17,16 +18,18 @@ function openMenu(divName){
 	promptFader(activeMenu, true);
 }
 
-function closeActiveMenu(keepBlockVisible){
+function closeActiveMenu(hideMenuBlock){
 	if(activeMenu){
 		promptFader(activeMenu, false);
 		activeMenu=null;
 	}
-	if(!keepBlockVisible){
+	if(hideMenuBlock){
 		promptFader(menuBlock, false);
 		setTimeout(()=>{menuBlock.style.zIndex=0;}, 1000);
 		
 		pxlMouse.inputActive=true;
+		pxlActive=true;
+		pxlRender();
 		/*if(catchNavigatorCalls && mobile){
 			window.removeEventListener('hardwareBackPress', backPress);
 		}*/
@@ -497,7 +500,7 @@ function pxlRender(){
 			failedBootCount=0;
 			totalFailedBootCount+=1;
 			if(totalFailedBootCount>5){
-				pxlPause=true;
+				pxlActive=false;
 				pxlCamBootError=true;
 				return;
 			}
@@ -525,15 +528,15 @@ function pxlRender(){
 	
 	if(delaySaveShot && useFlash && curTime>takeShotTime){
 		delaySaveShot=false;
-		pxlPause=true;
+		pxlActive=false;
 		saveShot();
 	}else{
-		if(camSafeResFound && !pxlPause){
+		if(camSafeResFound && pxlActive){
 			pxlRenderStack();
 		}
 	}
 	
-	if(!pxlPause){
+	if(pxlActive){
 		requestAnimationFrame(pxlRender);
 	}
 }

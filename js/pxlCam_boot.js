@@ -35,7 +35,7 @@ function init(){
 	pxlH=window.innerHeight*mapResPerc;
 	pxlCanvas.height=window.innerHeight;
 	mapBootEngine();
-	pxlRender(runner);
+	//pxlRender(runner);
 	pxlMouse.inputActive=true;
 	//mapPrepGUI();
 	//launchFullscreen(pxlCanvas);
@@ -62,7 +62,7 @@ function buildPhotoBin(){
 			<div id="photoBinScroller" class="menuScrollerInner">
 				<div class="photoBinEmpty">Photos you take will show up here.</div>
 			</div></td></tr>
-		<tr><td><div class="menuExitButton" onclick="closeActiveMenu(false);">Exit Menu </div></td></tr>
+		<tr><td><div class="menuExitButton" onclick="closeActiveMenu(true);">Exit Menu </div></td></tr>
 		</table
 	`;
 	photoBinMenu.innerHTML=html;
@@ -116,13 +116,14 @@ function prepVerbose(){
 		</div>
 		<div id="verbose_camRes">
 			Current Camera Res : <span id="verbose_curCamRes">--</span>
-		</div>
-		<div id="verbose_camPausedState">
+		</div>`;
+		/*<div id="verbose_camPausedState">
 			Orientation : Yaw - <span id="verbose_yaw">-</span> ; Pitch - <span id="verbose_pitch">-</span> ; Roll - <span id="verbose_roll">-</span> ;
 		</div>
 		<div id="verbose_camOrientationAngle">
 			Device Angle : <span id="verbose_curAngle">--</span>
-		</div>
+		</div>*/
+	innerVerbose+=`
 		<div id="verbose_gyroscope">
 			Gyroscope : X - <span id="verbose_gyrox">-</span> ; Y - <span id="verbose_gyroy">-</span> ; Z - <span id="verbose_gyroz">-</span> ;
 		</div>
@@ -133,8 +134,7 @@ function prepVerbose(){
 		</div>
 		<br>
 		<div id="verbose_spacer"> --- --- Console --- ---</div>
-		<div id="verbose_console"></div>
-	`;
+		<div id="verbose_console"></div>`;
 	let alDom=document.getElementById("icon-alignLines");
 	let topOff=alDom.offsetTop*2+parseFloat(alDom.style.height);
 	verbBlock.style.top=topOff;
@@ -259,6 +259,96 @@ function setCanvasRes(res,setCanvas=true,save=false){
 }
 
 //////////////////////////////////////
+// User-side cookie manager
+// This will accept the names of variables or array variables
+//   and store the contents as a document cookie
+// When using readCookies, the original variable is assigned
+//   its value is stored in the same structure as when written to the cookie
+// This cookie manager WILL NOT work on arrays of Classes & Objects
+const pxlCookieManager={
+	prepend:"pxlCam-", // Suffix name to help searching and avoid cookie name conflictions
+	exp:30, // Days till expiration
+	deleteDate:"expires=Thu, 01 Jan 1970 00:00:01 GMT;",
+	path:"path=/",
+	sub:"_%_", // Sbustitute ; with _%_
+	pullData(){
+		let cur=document.cookie;
+	},
+	getExpiration(){
+		let d=new Date();
+		d.setTime( d.getTime() + (this.exp*24*60*60*1000) );
+		return "expires="+d.toGMTString()+";";
+	},
+	valueToString(val){
+		let type=typeof(val);
+		if(type=="string"){
+			return "'"+val+"'";
+		}else if(type=="boolean"){
+			return (val?"true":"false");
+		}else if(val==null){ // null==undefined true; null===undefined false
+			return "null";
+		}else if(val==NaN){
+			return "NaN";
+		}else{
+			return val;
+		}
+	},
+	variableToString(arr){
+		if(Array.isArray(arr)){
+			let ret=arr.map((x)=>{
+				if(Array.isArray(x)){
+					return this.variableToString(x);;
+				}
+				return this.valueToString(x);
+			});
+			return "["+ret.join(",")+"]";
+		}else{
+			return this.valueToString(arr);
+		}
+	},
+	hasCookie(cName){
+		return document.cookie.indexOf(this.prepend+cName)>-1;
+	},
+	readCookie(cName){
+		if(this.hasCookie(cName)){
+			let reg=new RegExp('(?='+this.prepend+cName+').*?((?=;)|(?=$))', 'g');
+			return document.cookie.match(reg)[0].split("=")[1].replace(this.prepend,'').replace(this.sub,';');
+		}
+		return null;
+	},
+	evalCookies(){
+		let reg=new RegExp('(?='+this.prepend+').*?((?=;)|(?=$))', 'g');
+		document.cookie.match(reg).map(e=>{eval(e.replace(this.prepend,'').replace(this.sub,';'))});
+	},
+	setCookie(cName){
+		if(typeof(cName)=="string"){
+			cName=[cName];
+		}
+		for(let x=0; x<cName.length;++x){
+			let cData=eval(cName[x]);
+			cData=this.variableToString(cData);
+			cData.replace(";",this.sub);
+			document.cookie=this.prepend+cName[x]+"="+cData+";"+this.getExpiration()+this.path;
+		}
+	},
+	clearCookie(cName=''){
+		if(cName==''){
+			let reg=new RegExp('(?='+this.prepend+').*?(?==)', 'g');
+			let curCookies=document.cookie.match(reg);
+			console.log(curCookies);
+			curCookies.map(c=>{document.cookie=c+"=;"+this.deleteDate+this.path;});
+			console.log(document.cookie);
+		}else{
+			if(typeof(cName)=="string"){
+				cName=[cName];
+			}
+			cName.map(c=>{document.cookie=c+"=;"+this.deleteDate+this.path;console.log(c+"=;"+this.deleteDate+this.path);});
+		}
+	}
+}
+
+
+//////////////////////////////////////
 
 function mapBootEngine(){
 	
@@ -315,7 +405,10 @@ function mapBootEngine(){
 		}
 	}else{
 		webcamVideo.onloadedmetadata=()=>{
-			//webcamVideo.play();
+			webcamVideo.play();
+			if(camSafeResFound && camSafeResBooting && !camSafeResBooted){
+				camSafeResBooted=true;
+			}
 		}
 	}
 	

@@ -53,11 +53,10 @@ EOT;
 	$mobile=$mobile==1?"true":"false";
 	$t=time();
 ?>
-<html>
-<head>
-</head>
+<!DOCTYPE>
+<html lang="en">
 <!--
-Created by Kevin Edzenga; February 2020 -- 
+Created by Kevin Edzenga; February/March 2020 -- 
 If you are digging around in the source, I'm glad others do too!
 
 To-Dos-
@@ -80,7 +79,16 @@ pxlCam_shaderScripts.js
   ThreeJS composer options
   Convert and save a given canvas with a function, see `takeShot()`
 -->
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"></meta>
+<meta name='theme-color' content='#383838'>
+<title>pxlCam :: A Filtered World</title>
+<meta name="description" content="Reality seen through the filter of technology.  Colorized tinctures for a new view of life.">
+<meta name="keywords" content="camera,cam,filter,filters,ar,augmented,reality,webgl,opengl,threejs,experiment,create,fun,web,app,free">
+<meta name="author" content="Kevin Edzenga">
+<meta name="ROBOTS" content="INDEX, NOFOLLOW">
+
 <link rel="stylesheet" href="pxlCamStyle.css?q=<?php echo $t; ?>">
 <script src="js/pxlCam_three.min.js"></script>
 <script src="js/EffectComposer.js"></script>
@@ -104,6 +112,7 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 <script src="js/pxlCam_deviceScripts.js?q=<?php echo $t; ?>"></script>
 <script src="js/pxlCam_shaderScripts.js?q=<?php echo $t; ?>"></script>
 
+</head>
 <body onLoad="init();">
 <div id="verbose" class="verboseBlock"></div>
 
@@ -138,7 +147,7 @@ var mapToDoList=`<?php echo $todoList; ?>`;
 </div>
 
 <div id="menuBlock" class="menuBlock visOff">
-	<div id="menuExit" class="menuExit" onclick="closeActiveMenu(false);"></div>
+	<div id="menuExit" class="menuExit" onclick="closeActiveMenu(true);"></div>
 	<div id="photoBinMenu" class="photoBinMenu menuParent visOff"></div>
 </div>
 
