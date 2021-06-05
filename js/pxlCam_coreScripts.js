@@ -543,5 +543,11 @@ function pxlRender(){
 
 function pxlRenderStack(){
 	pxlCamComposer.render();
-	pxlCamShaderComposer.render();
+	if(haarFeatureHelperDisplay){
+		createEigenImage(webcamVideo);
+		pxlCamHaarFeatureComposer.render();
+		pxlCamHaarFeatureRenderComposer.render();
+	}else{
+		pxlCamShaderComposer.render();
+	}
 }

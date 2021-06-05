@@ -268,21 +268,18 @@ function findMediaDevices(){
 			findMediaDeviceData(mediaDevices);
 		}).then(()=>{
 			if(pxlCookieManager.hasCookie("webcamList")){
-				console.log("found cookie");
-				let tmp=[...webcamList];
-				let tmpString=pxlCookieManager.variableToString(tmp);
-				let cookieValue=pxlCookieManager.readCookie("webcamList").toString();
-				if(tmpString==cookieValue){
-					//console.log("Cookies read");
-					pxlCookieManager.evalCookies();
+				if(pxlCookieManager.isEqual("webcamList")){
+					if(verbose) verbConsole.innerHTML+="<br> - Cookies read -";
+					pxlCookieManager.evalCookie();
 					camResCheckList=[];
 					camSafeResFound=true;
 					delayLoadCam=true;
 				}else{
-					//console.log("Cookies cleared");
+					if(verbose) verbConsole.innerHTML+="<br> - Cookies cleared -";
 					pxlCookieManager.clearCookie();
 				}
 			}else{
+				if(verbose) verbConsole.innerHTML+="<br> - Setting cookies -";
 				pxlCookieManager.setCookie("webcamList");
 			}
 			pxlActive=true;

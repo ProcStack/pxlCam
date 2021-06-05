@@ -173,12 +173,12 @@ function prepVerbose(){
 }
 
 function verbFunction(){
- //stepThumbnailRebuild();
- verbScriptToggle=!verbScriptToggle;
- //findPictureAspect(verbScriptToggle);
- //let res=(verbScriptToggle?[sW,sH]:[sH,sH]);
-//setCanvasRes(res);
-bootCamera();
+	verbScriptToggle=!verbScriptToggle;
+	//pxlCookieManager.clearCookie()
+	if(!pxlCamHaarFeatureComposer){
+		buildHaarFeatureComposer();
+	}
+	haarFeatureHelper(verbScriptToggle);
 	//camCorrectionShader.uniforms.uResAspectX.value=1;
 	//camCorrectionShader.uniforms.uResAspectY.value=1;
 }
@@ -259,27 +259,28 @@ function setCanvasRes(res,setCanvas=true,save=false){
 }
 
 //////////////////////////////////////
-// User-side cookie manager
+// pxlCam user-side cookie manager;
+//   Kevin Edzenga; 2020
 // This will accept the names of variables or array variables
 //   and store the contents as a document cookie
-// When using readCookies, the original variable is assigned
+// When using readCookie, the original variable is assigned
 //   its value is stored in the same structure as when written to the cookie
-// This cookie manager WILL NOT work on arrays of Classes & Objects
+// This cookie manager WILL NOT work on arrays of Classes & Non-Array Objects
 const pxlCookieManager={
 	prepend:"pxlCam-", // Suffix name to help searching and avoid cookie name conflictions
 	exp:30, // Days till expiration
-	deleteDate:"expires=Thu, 01 Jan 1970 00:00:01 GMT;",
-	path:"path=/",
+	path:"path=/", // Update this with the folder name from your domain
+	deleteDate:"expires=Thu, 01 Jan 1970 00:00:01 GMT;", // Leave this, this forces cookies to be removed when set
 	sub:"_%_", // Sbustitute ; with _%_
-	pullData(){
+	pullData(){ // Read all document cookies
 		let cur=document.cookie;
 	},
-	getExpiration(){
+	getExpiration(){ // Set expiration date for the new cookie
 		let d=new Date();
 		d.setTime( d.getTime() + (this.exp*24*60*60*1000) );
 		return "expires="+d.toGMTString()+";";
 	},
-	valueToString(val){
+	valueToString(val){ // Convert given value to a string
 		let type=typeof(val);
 		if(type=="string"){
 			return "'"+val+"'";
@@ -293,11 +294,11 @@ const pxlCookieManager={
 			return val;
 		}
 	},
-	variableToString(arr){
+	variableToString(arr){ // Convert a given variable to a string; account for arrays or not
 		if(Array.isArray(arr)){
 			let ret=arr.map((x)=>{
 				if(Array.isArray(x)){
-					return this.variableToString(x);;
+					return this.variableToString(x);
 				}
 				return this.valueToString(x);
 			});
@@ -306,21 +307,37 @@ const pxlCookieManager={
 			return this.valueToString(arr);
 		}
 	},
-	hasCookie(cName){
+	hasCookie(cName){ // Check if a cookie exists
 		return document.cookie.indexOf(this.prepend+cName)>-1;
 	},
-	readCookie(cName){
+	readCookie(cName){ // Read the value of the cookie
 		if(this.hasCookie(cName)){
 			let reg=new RegExp('(?='+this.prepend+cName+').*?((?=;)|(?=$))', 'g');
 			return document.cookie.match(reg)[0].split("=")[1].replace(this.prepend,'').replace(this.sub,';');
 		}
 		return null;
 	},
-	evalCookies(){
-		let reg=new RegExp('(?='+this.prepend+').*?((?=;)|(?=$))', 'g');
-		document.cookie.match(reg).map(e=>{eval(e.replace(this.prepend,'').replace(this.sub,';'))});
+	isEqual(cName){ // Is the cookie value equal to a viben input
+		if(this.hasCookie(cName)){
+			return this.readCookie(cName) == this.variableToString(eval(cName));
+		}
+		return false;
 	},
-	setCookie(cName){
+	evalCookie(cName){ // Read all cookie entries with the given suffix
+		if(cName){
+			if(this.hasCookie(cName)){
+				let reg=new RegExp('(?='+this.prepend+cName+').*?((?=;)|(?=$))', 'g');
+				eval(document.cookie.match(reg)[0].replace(this.prepend,'').replace(this.sub,';'));
+				return true;
+			}
+			return false;
+		}else{
+			let reg=new RegExp('(?='+this.prepend+').*?((?=;)|(?=$))', 'g');
+			document.cookie.match(reg).forEach(e=>{eval(e.replace(this.prepend,'').replace(this.sub,';'))});
+			return true;
+		}
+	},
+	setCookie(cName){ // Set cookie value
 		if(typeof(cName)=="string"){
 			cName=[cName];
 		}
@@ -331,18 +348,16 @@ const pxlCookieManager={
 			document.cookie=this.prepend+cName[x]+"="+cData+";"+this.getExpiration()+this.path;
 		}
 	},
-	clearCookie(cName=''){
-		if(cName==''){
+	clearCookie(cName){ // Clear specific cookie entry
+		if(!cName){
 			let reg=new RegExp('(?='+this.prepend+').*?(?==)', 'g');
 			let curCookies=document.cookie.match(reg);
-			console.log(curCookies);
-			curCookies.map(c=>{document.cookie=c+"=;"+this.deleteDate+this.path;});
-			console.log(document.cookie);
+			curCookies.forEach(c=>{document.cookie=c+"=;"+this.deleteDate+this.path;});
 		}else{
 			if(typeof(cName)=="string"){
 				cName=[cName];
 			}
-			cName.map(c=>{document.cookie=c+"=;"+this.deleteDate+this.path;console.log(c+"=;"+this.deleteDate+this.path);});
+			cName.forEach(c=>{document.cookie=c+"=;"+this.deleteDate+this.path;console.log(c+"=;"+this.deleteDate+this.path);});
 		}
 	}
 }
@@ -363,6 +378,8 @@ function mapBootEngine(){
 	pxlCamEngine.setPixelRatio(1);//window.devicePixelRatio);
 	pxlCamEngine.setSize(pxlW, pxlH);
 	//pxlCamEngine.gammaOutput=true;
+	var aspectRatio=pxlCanvas.width/pxlCanvas.height;
+	var aspectInverseRatio=pxlCanvas.height/pxlCanvas.width;
 	
 	pxlCamRenderTarget=new THREE.WebGLRenderTarget(pxlW,pxlH,{
 		minFilter:THREE.LinearFilter,
@@ -371,11 +388,22 @@ function mapBootEngine(){
 		stencilBuffer:false
 	});
 	
+	haarFeatureRes=[parseInt(pxlW*.25),parseInt(pxlH*.25)];
+	if(haarFeatureRes[0]>eigenImageMaxRes || haarFeatureRes[1]>eigenImageMaxRes){
+			haarFeatureRes=aspectRatio>1?[eigenImageMaxRes, parseInt(eigenImageMaxRes*aspectInverseRatio)]:[parseInt(eigenImageMaxRes*aspectRatio), eigenImageMaxRes];
+	}
+	pxlCamHaarFeatureRenderTarget=new THREE.WebGLRenderTarget(...haarFeatureRes,{
+		magFilter:THREE.NearestFilter,
+		format:THREE.RGBAFormat,//THREE.RedFormat,
+	});
+	eigenImage=document.createElement("canvas");
+	eigenImage.width=haarFeatureRes[0];
+	eigenImage.height=haarFeatureRes[1];
+	
 	//texLoader=new THREE.ImageLoader();
 	
 	/////////////////////////////////////////////
 	
-	var aspectRatio=pxlCanvas.width/pxlCanvas.height;
 	pxlCamCamera=new THREE.PerspectiveCamera(35,aspectRatio, 1, 3000);
 	pxlCamCamera.position.z=sH*2;
 	pxlCamCamera.target=new THREE.Vector3(0,0,0);
@@ -402,6 +430,22 @@ function mapBootEngine(){
 				camSafeResBooted=true;
 				verbConsole.innerHTML+="<br>"+webcamVideo.videoWidth+" x "+webcamVideo.videoHeight;
 			}
+			
+			let vW=webcamVideo.videoWidth;
+			let vH=webcamVideo.videoHeight;
+			var aspectRatio=vW/vH;
+			var aspectInverseRatio=vH/vW;
+			haarFeatureRes=[parseInt(vW*.25),parseInt(vH*.25)];
+			if(haarFeatureRes[0]>eigenImageMaxRes || haarFeatureRes[1]>eigenImageMaxRes){
+					haarFeatureRes=aspectRatio>1?[eigenImageMaxRes, parseInt(eigenImageMaxRes*aspectInverseRatio)]:[parseInt(eigenImageMaxRes*aspectRatio), eigenImageMaxRes];
+			}
+			pxlCamHaarFeatureRenderTarget=new THREE.WebGLRenderTarget(...haarFeatureRes,{
+				magFilter:THREE.NearestFilter,
+				format:THREE.RGBAFormat,//THREE.RedFormat,
+			});
+			eigenImage=document.createElement("canvas");
+			eigenImage.width=haarFeatureRes[0];
+			eigenImage.height=haarFeatureRes[1];
 		}
 	}else{
 		webcamVideo.onloadedmetadata=()=>{

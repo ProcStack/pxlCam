@@ -76,9 +76,14 @@ function findPictureAspect(save=false){ // ## Computer aspect ratio looks wrong,
 		//	malformAdjust=res[0]/res[1];
 		//}
 	}
+	camPictureAspect=[1,1]; // ##
 	camCorrectionShader.uniforms.uMalformX.value=malformAdjust;
 	camCorrectionShader.uniforms.uResAspectX.value=camPictureAspect[0];
 	camCorrectionShader.uniforms.uResAspectY.value=camPictureAspect[1];
+	if(haarFeatureShader){
+		haarFeatureShader.uniforms.uResAspectX.value=camPictureAspect[0];
+		haarFeatureShader.uniforms.uResAspectY.value=camPictureAspect[1];
+	}
 }
 function takeShot(){
 	if(useFlash){
@@ -89,7 +94,7 @@ function takeShot(){
 }
 function saveShot(){
 	let r=camSafeResValid[webcamActive][0];//camSafeRes[webcamActive];
-	r=mobile && sH>sW?[r[1],r[0]]:r;
+	r=mobile && sH<sW?[r[1],r[0]]:r; // ## Broekn for mobile, sW vs sH
 	var cameraRender,cameraCanvas,curRotCanvas;
 	setCanvasRes(r,true,true); // Renders the scene too	
 	setDeviceFlash(false);
@@ -568,3 +573,213 @@ function webcamFragment_hueSatch(){
 	return retFrag;
 }
 
+
+///////////////////////////////////////////////
+// Haar Features & Eigen Image Functions //////
+//  - Facial Detection Scripts ////////////////
+///////////////////////////////////////////////
+function buildHaarFeatureComposer(){
+	createEigenImage(webcamVideo);
+	pxlCamHaarFeatureComposer=new THREE.EffectComposer(pxlCamEngine,pxlCamHaarFeatureRenderTarget);
+	let haarFeaturePass=new THREE.ShaderPass(haarFeatureShader,pxlCamHaarFeatureRenderTarget.texture);
+	pxlCamHaarFeatureComposer.addPass(haarFeaturePass);
+	haarFeaturePass.clear=false;
+	
+	pxlCamHaarFeatureRenderComposer=new THREE.EffectComposer(pxlCamEngine);
+	let haarFeatureRenderPass=new THREE.ShaderPass(haarFeatureRenderShader,pxlCamCamera);
+	pxlCamHaarFeatureRenderComposer.addPass(haarFeatureRenderPass);
+	haarFeatureRenderPass.clear=false;
+	haarFeatureRenderPass.renderToScreen=true;
+}
+function buildHaarFeatureShader(eigenTexture){
+	haarFeatureShader=new THREE.ShaderMaterial({
+		uniforms:{
+			"tDiffuse":{type:"t",value:0,texture:null},
+			"tEigenimage":{type:"t",value:0,texture:null},
+			"uResScaleX":{type:"f",value:1/haarFeatureRes[0]},
+			"uResScaleY":{type:"f",value:1/haarFeatureRes[1]},
+			"uResAspectX":{type:"f",value:1},
+			"uResAspectY":{type:"f",value:1}
+		},
+		vertexShader:webcamVertex(),
+		fragmentShader:haarFeatureSearchFrag()
+	});
+	haarFeatureShader.uniforms.tDiffuse.value=pxlCamRenderTarget.texture;
+	haarFeatureShader.uniforms.tEigenimage.value=eigenTexture;
+	
+	haarFeatureRenderShader=new THREE.ShaderMaterial({
+		uniforms:{
+			"tDiffuse":{type:"t",value:0,texture:null},
+			"uResX":{type:"f",value:haarFeatureRes[0]},
+			"uResY":{type:"f",value:haarFeatureRes[1]},
+			"uResScaleX":{type:"f",value:1/haarFeatureRes[0]},
+			"uResScaleY":{type:"f",value:1/haarFeatureRes[1]}
+		},
+		vertexShader:webcamVertex(),
+		fragmentShader:haarFeatureRenderFrag()
+	});
+	haarFeatureRenderShader.uniforms.tDiffuse.value=pxlCamHaarFeatureRenderTarget.texture;
+}
+
+function createEigenImage(canvas){
+	if(typeof(canvas)=="string"){
+		canvas=document.getElementById(canvas);
+	}
+	var ctx=eigenImage.getContext("2d");
+	ctx.drawImage(canvas, 0,0, canvas.width, canvas.height, 0,0, ...haarFeatureRes);
+	let rtDom=pxlCamRenderTarget;
+	//console.log(rtDom);
+	//ctx.drawImage(rtDom.texture, 0,0, rtDom.viewport.z, rtDom.viewport.w, 0,0, ...haarFeatureRes);
+	let imgData=ctx.getImageData(0,0,eigenImage.width,eigenImage.height);
+	let pix=imgData.data;
+	let eigenRun=haarFeatureRes[0]*haarFeatureRes[1];
+	let eigenDataBase=new Array(eigenRun);
+	let eigenData=new Array(eigenRun);
+	
+	// Build Eigenimage data; value accumulation top-left corner to bottom-right corner
+	// | | | |  -> -> ->
+	// builds top down, and left to right, in one loop
+	let d=new Date().getTime();
+	for (var v=0; v<eigenRun; v++){//+=4) {
+		let c=v*4;
+		let x=v%haarFeatureRes[0];
+		let y=Math.floor(v/haarFeatureRes[0]);
+		let readOffset=(y-1)*haarFeatureRes[0]+x;
+		let yValOffset=y>0?eigenDataBase[readOffset]+0:0;
+		let xValOffset=x>0?eigenData[v-1]:0;
+		
+		let curValue=(1-(pix[c]+pix[c+1]+pix[c+2])*.33333333333*0.00392156862745098);
+		eigenDataBase[v]=curValue+yValOffset;
+		eigenData[v]=curValue+yValOffset+xValOffset;
+	}
+	
+	// ## Check for float texture, if not, use Uint8Array and THREE.UnsignedByteType
+	//      Might be useful to not have this mode if not
+	//pxlCamEngine.context.getExtension('OES_texture_float');
+	//pxlCamEngine.context.getExtension('OES_texture_float_linear');
+	
+	eigenDataBase=new Float32Array(eigenDataBase);
+	eigenData=new Float32Array(eigenData);
+	//eigenTexture= new THREE.DataTexture(eigenDataBase, haarFeatureRes[0], haarFeatureRes[1], THREE.LuminanceFormat, THREE.FloatType);
+	eigenTexture= new THREE.DataTexture(eigenData, haarFeatureRes[0], haarFeatureRes[1], THREE.LuminanceFormat, THREE.FloatType);
+	eigenTexture.magFilter=THREE.NearestFilter;
+	eigenTexture.needsUpdate=true;
+	
+	if(haarFeatureShader){
+		haarFeatureShader.uniforms.tEigenimage.value=eigenTexture;
+	}else{
+		buildHaarFeatureShader(eigenTexture);
+	}
+}
+
+function haarFeatureHelper(ehActive){
+	haarFeatureHelperDisplay=ehActive;
+}
+function haarFeatureSearchFrag(){
+	let zoneSize="22.0";
+	let zoneResize=1/parseFloat(zoneSize);
+	var retFrag= ``;
+	if(pxlQuality.shaderPrecision==3){
+		retFrag+=`
+			#ifdef GL_FRAGMENT_PRECISION_HIGH
+				precision highp float;
+			#else
+				precision mediump float;
+			#endif`;
+	}else if(pxlQuality.shaderPrecision==2){
+		retFrag+=`
+			precision mediump float;`;
+	}else{
+		retFrag+=`
+			precision lowp float;`;
+	}
+	retFrag+=`
+		uniform sampler2D	tDiffuse;
+		uniform sampler2D	tEigenimage;
+		uniform float		uResX;
+		uniform float		uResY;
+		uniform float		uResScaleX;
+		uniform float		uResScaleY;
+		
+		varying vec2		vUv;
+		
+		void main( void ){
+			vec2 uv = vUv;
+			vec2 vidUV=vec2(uv.x, 1.0-uv.y);
+			float featureThresh=0.5;
+			float zoneSize=`+zoneSize+`;
+			float zoneResize=`+zoneResize+`;
+			vec4 Cd=texture2D(tDiffuse,vidUV);
+			//vec4 Cd=texture2D(tEigenimage,vidUV);
+			//Cd=vec4(vec3(eigen),1.0);
+			vec2 rangeFrom=floor(uv*zoneSize);
+			vec2 rangeTo=floor( uv*zoneSize+vec2(1.0));
+			vec2 rangeMid=vec2( (rangeTo.x+rangeFrom.x)*.5, (rangeTo.y+rangeFrom.y)*.45);
+			
+			// ## This is off by 1 in X and Y axes
+			// Just get it working!
+			float bright=(rangeTo.x-rangeFrom.x)*(rangeMid.y-rangeFrom.y);
+			float dark=(rangeTo.x-rangeFrom.x)*(rangeTo.y-rangeMid.y);
+			float count=(rangeTo.x-rangeFrom.x-1.0)*(rangeTo.y-rangeFrom.y);
+			float avg=bright/count;
+			
+			rangeFrom=rangeFrom*zoneResize-vec2(uResScaleX,uResScaleY);
+			rangeMid=rangeMid*zoneResize-vec2(uResScaleX,uResScaleY);
+			rangeTo=rangeTo*zoneResize-vec2(uResScaleX,uResScaleY);
+			
+			float eigenTR=texture2D( tEigenimage,vec2(rangeTo.x, rangeFrom.y) ).x;
+			float eigenTL=texture2D( tEigenimage,vec2(rangeFrom.x, rangeFrom.y) ).x;
+			float eigenML=texture2D( tEigenimage,vec2(rangeFrom.x, rangeMid.y) ).x;
+			float eigenMR=texture2D( tEigenimage,vec2(rangeTo.x, rangeMid.y) ).x;
+			float eigenBL=texture2D( tEigenimage,vec2(rangeFrom.x, rangeTo.y) ).x;
+			float eigenRefMid=texture2D( tEigenimage,vec2(rangeTo.x, rangeMid.y) ).x;
+			float eigenRefMax=texture2D( tEigenimage,vec2(rangeTo.x, rangeTo.y) ).x;
+			float eigenBright=(eigenRefMid-eigenTR-eigenML+eigenTL)/bright;
+			float eigenDark=(eigenRefMax-eigenMR-eigenBL+eigenML)/dark;
+			//float eigen=(uv.y-rangeMid.y)*10.0>.5?eigenBright:eigenDark;
+			float eigen=eigenDark<eigenBright?0.0:1.0;
+			float debug=(eigenDark-eigenBright)>featureThresh?0.0:1.0;//1.0:0.0;
+			
+			//Cd=mix( texture2D(tDiffuse,vidUV), vec4(1.0,0.0,0.0,1.0), eigen );
+			//Cd=mix( vec4(vec3(eigen),1.0), vec4(1.0,0.0,0.0,1.0), eigen );
+			Cd=vec4(debug,Cd.x,Cd.x,1.0);
+			
+			gl_FragColor=Cd;
+		}`;
+	
+	return retFrag;
+}
+function haarFeatureRenderFrag(){
+	var retFrag= ``;
+	if(pxlQuality.shaderPrecision==3){
+		retFrag+=`
+			#ifdef GL_FRAGMENT_PRECISION_HIGH
+				precision highp float;
+			#else
+				precision mediump float;
+			#endif`;
+	}else if(pxlQuality.shaderPrecision==2){
+		retFrag+=`
+			precision mediump float;`;
+	}else{
+		retFrag+=`
+			precision lowp float;`;
+	}
+	retFrag+=`
+		uniform sampler2D	tDiffuse;
+		uniform float		uResScaleX;
+		uniform float		uResScaleY;
+		
+		varying vec2		vUv;
+		
+		void main( void ){
+			vec2 uv = vUv;
+			uv.y=1.0-uv.y;
+			
+			vec4 Cd=texture2D(tDiffuse,uv);
+			
+			gl_FragColor=Cd;
+		}`;
+	
+	return retFrag;
+}

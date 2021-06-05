@@ -3,30 +3,18 @@
 	$verbose=0;
 	$todoList=<<<EOT
 ==================================================================
-As of February 29th, 2020 -
- - Converted mouse/touch functionality to a self contained class constructor
+As of March 8th, 2020 -
+ - Added a self contained browser cookie management system
+ - Store found camera names and resolutions into browser cookies
+ - Switched deviceOrientation to accelerometerWithGravity to calculate photo rotation
 To-Dos-
- - Figure out why wide camera lenses' aspect ratio is shot to hell.
-     Implemented a system to read pixel information on areas of the screen
-	   This is used to determine if the resolution should be corrected
-	   Corrections calcualted through -
-	     pxlCam_shaderScripts.js; findPictureAspect(); camMalformFlip[webcamActive]
-     Most likely a Three.js scene size issue.
-     The camera videoWidth/videoHeight appears correct
-     Drawing the unadjusted canvas, 1-to-1 of the camera res,
-       Draws the aspect ratio just fine.
+ - Figure out why wide camera lenses don't load
  - Build Camera Class - 'pxlCam_deviceScripts.js' functions
      Video Media listings
      Auto-camera res finder
  - Build Menu Class - For easier bootstrapping in the future
      Nested menus with back buttons
      Auto generated fade css classes
- - Build Mouse/Touch Class - For easier bootstrapping in the future
-     Maintain Current/Previous position
-     Calculate velocity information
-     Developer set functions for eval for
-       mouseDown/touchStart, mouseDrag/touchMove, mouseUp/touchEnd
- - Add cookies to maintain camera resolutions for faster loading
  - Add cookies to find website crashes to reduce quality on load
  - Add javascript worker
      Faster canvas processing
@@ -63,6 +51,9 @@ To-Dos-
 <?php echo $todoList; ?>
 
 Things of importance --
+pxlCam_boot.js
+  Contains pxlCookieManager(); a user-side cookie management system
+    Read, Write, Exists, Is-Equal-To Variable, Convert arrays and nested arrays to string
 pxlCam_mouseTouch.js
   Contains an isolated mouse and touch controller class
   Maintains current/previous positions

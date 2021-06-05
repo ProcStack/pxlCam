@@ -1,9 +1,12 @@
 // Standard unprofessional global variables
 var pxlCamCore="pxlCam-core";
-var pxlCamEngine,pxlCamGL,pxlCamCamera,pxlCamScene,pxlCamComposer, pxlCamShaderComposer;
+var pxlCamEngine,pxlCamGL,pxlCamCamera,pxlCamScene,pxlCamComposer, pxlCamShaderComposer,pxlCamHaarFeatureComposer,pxlCamHaarFeatureRenderComposer;
 var camCorrectionShader, filterShader; // ## Rename smartBlur instances to picturePrep
-var cameraRenderPass,camCorrectionShaderPass,filterShaderPass;
+var cameraRenderPass,camCorrectionShaderPass,filterShaderPass,haarFeatureShader,haarFeatureRenderShader;
 var pxlCamRenderTarget;
+var pxlCamHaarFeatureRenderTarget,eigenImage,eigenTexture;
+var eigenImageMaxRes=192;
+var haarFeatureRes=[100,100];
 var pxlActive=false;
 var mapResPerc=1;//mobile?.25:.5; // ## Automatic quality reduction, NOT IMPLEMENTED
 var mapAutoQuality=1;
@@ -27,7 +30,7 @@ var flashActive=false;
 var delaySaveShot=false; // Wait till next next requestAnimationFrame before booting the camera, pxlRender()
 // ## Verbose dom objects. Could be cleaned up more; put into a class or something...
 var verbBlock,verbFPS,verbDeviceRes,verbCurCam,verbCurCamName,verbPrevCamName,verbMaxCam,verbPaused,verbConsole,verbErrorConsole,verbYaw,verbPitch,verbRoll,verbCamRes,verbCurAngle,verbGravityX,verbGravityY,verbGravityZ;
-var verbScriptToggle=true;
+var verbScriptToggle=false;
 
 var pxlProcessScene=null; // pxlProcessScene.add(processorObj[0]);
 var pxlCanvas,pxlW,pxlH;
@@ -167,6 +170,12 @@ var phonePoseActive=false;
 var phone_ypr=[0,0,0];
 var phone_yprDelta=[0,0,0];
 var phone_yprInit=[0,0,0];
+
+
+// ========================================
+
+var haarFeatureHelperDisplay=false;
+
 
 // ========================================
 // NOT CURRENTLY USED
